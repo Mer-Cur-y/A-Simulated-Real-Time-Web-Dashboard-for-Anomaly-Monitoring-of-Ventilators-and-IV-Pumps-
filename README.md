@@ -38,4 +38,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 เริ่ใช้งาน
 
-รัน nmp run dev ใน teminal
+รัน nmp run dev ใน teminal"# A-Simulated-Real-Time-Web-Dashboard-for-Anomaly-Monitoring-of-Ventilators-and-IV-Pumps-" 
