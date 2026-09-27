@@ -14,7 +14,6 @@ import {
 export function usePatientSummary(
   wardId: string
 ) {
-
   const [summary, setSummary] =
     useState<PatientSummary>({
       normal: 0,
@@ -30,9 +29,7 @@ export function usePatientSummary(
 
   const loadSummary = useCallback(
     async () => {
-
       try {
-
         setLoading(true);
         setError("");
 
@@ -40,21 +37,15 @@ export function usePatientSummary(
           await getPatientSummary(wardId);
 
         setSummary(data);
-
       } catch (err) {
-
         setError(
           err instanceof Error
             ? err.message
             : "ไม่สามารถโหลดสรุปข้อมูลได้"
         );
-
       } finally {
-
         setLoading(false);
-
       }
-
     },
     [wardId]
   );

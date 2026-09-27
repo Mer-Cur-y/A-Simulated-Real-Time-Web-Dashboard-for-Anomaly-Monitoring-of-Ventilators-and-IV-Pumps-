@@ -1,13 +1,29 @@
-export type PatientStatus =
+  
+export type MonitorStatus =
   | "normal"
   | "warning"
   | "critical";
 
+export type SalineStatus =
+  | "normal"
+  | "low"
+  | "empty";
+
+export type WardStatus =
+  | "onward"
+  | "discharged"
+  | "transferred";
+
 export interface PatientDashboard {
-  patient_id: string;
+  uwid: string;
+
+  opd: string;
 
   first_name: string;
   last_name: string;
+
+  gender: string | null;
+  birthdate: string | null;
 
   ward_id: string;
   ward_name: string;
@@ -15,14 +31,13 @@ export interface PatientDashboard {
   room_number: string | null;
   bed_number: string | null;
 
-  status: PatientStatus;
+  ward_status: WardStatus;
 
-  severity_score: number;
-  active_alert_count: number;
+  monitor_status: MonitorStatus;
+  saline_status: SalineStatus;
 
-  saline_percentage: number | null;
+  saline_value: number | null;
 
   spo2: number | null;
   heart_rate: number | null;
-  peak_pressure: number | null;
 }

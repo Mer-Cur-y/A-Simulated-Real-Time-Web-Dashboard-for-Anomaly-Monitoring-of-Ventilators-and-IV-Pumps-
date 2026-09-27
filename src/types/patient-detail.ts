@@ -3,7 +3,6 @@ export interface PatientDetail {
   first_name: string;
   last_name: string;
 
-  ward_id: string;
   ward_name: string;
 
   room_number: string | null;

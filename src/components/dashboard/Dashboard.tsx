@@ -1,71 +1,127 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
+import { usePatients } from "@/hooks/usePatients";
+import { useWards } from "@/hooks/useWards";
+
+import StatusSummary from "./StatusSummary";
 import WardFilter from "./WardFilter";
 import PatientList from "./patients/PatientList";
 
-import { useWards } from "@/hooks/useWards";
-import { usePatients } from "@/hooks/usePatients";
-
 export default function Dashboard() {
-  const [wardId, setWardId] = useState("all");
+  const [selectedWardId, setSelectedWardId] = useState("all");
+
+  const router = useRouter();
+
+  const { wards, loading: wardsLoading, error: wardsError } = useWards();
 
   const {
-    wards,
-    loading: wardsLoading,
-  } = useWards();
+    patients,
+    loading: patientsLoading,
+    error: patientsError,
+  } = usePatients({
+    wardId: selectedWardId,
+  });
 
-  const {
-  patients,
-  loading: patientsLoading,
-  error: patientsError,
-} = usePatients(
-  wardId,
-  status
-);
+  const summary = useMemo(() => {
+    return {
+      total: patients.length,
+
+      normal: patients.filter((patient) => patient.monitor_status === "normal")
+        .length,
+
+      warning: patients.filter(
+        (patient) => patient.monitor_status === "warning",
+      ).length,
+
+      critical: patients.filter(
+        (patient) => patient.monitor_status === "critical",
+      ).length,
+
+      salineLow: patients.filter((patient) => patient.saline_status === "low")
+        .length,
+
+      salineEmpty: patients.filter(
+        (patient) => patient.saline_status === "empty",
+      ).length,
+    };
+  }, [patients]);
+
+  const handlePatientClick = (patient: (typeof patients)[number]) => {
+    router.push(`/dashboard/patients/${patient.uwid}`);
+  };
+
+  const selectedWardName =
+    selectedWardId === "all"
+      ? "ทุก Ward"
+      : (wards.find((ward) => ward.wid === selectedWardId)?.name ?? "-");
 
   return (
-    <main className="min-h-screen bg-base-200 p-6">
-
-      <div className="max-w-7xl mx-auto">
-
+    <main className="min-h-screen bg-base-200 p-4 md:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl">
         {/* Header */}
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold md:text-3xl">
+              Patient Dashboard
+            </h1>
 
-        <div className="mb-6">
+            <p className="mt-1 text-sm text-base-content/60">
+              ระบบติดตามและดูแลผู้ป่วย
+            </p>
+          </div>
 
-          <h1 className="text-3xl font-bold">
-            Patient Dashboard
-          </h1>
-
-          <p className="opacity-60">
-            ระบบติดตามและเฝ้าระวังผู้ป่วย
-          </p>
-
+          <div>
+            {wardsError ? (
+              <div className="text-sm text-error">{wardsError}</div>
+            ) : (
+              <WardFilter
+                wards={wards}
+                selectedWardId={selectedWardId}
+                onWardChange={setSelectedWardId}
+              />
+            )}
+          </div>
         </div>
 
-        {/* Filter */}
-
-        {!wardsLoading && (
-          <div className="mb-6">
-            <WardFilter
-              wards={wards}
-              value={wardId}
-              onChange={setWardId}
-            />
-          </div>
-        )}
-
-        {/* Patient list */}
-
-        <PatientList
-          patients={patients}
-          loading={patientsLoading}
-          error={patientsError}
+        {/* Status Summary */}
+        <StatusSummary
+          total={summary.total}
+          normal={summary.normal}
+          warning={summary.warning}
+          critical={summary.critical}
+          salineLow={summary.salineLow}
+          salineEmpty={summary.salineEmpty}
         />
 
-      </div>
+        {/* Patient List */}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">รายชื่อผู้ป่วย</h2>
 
+              <p className="text-sm text-base-content/60">
+                แสดง {patients.length} ราย
+              </p>
+            </div>
+
+            {!wardsLoading && (
+              <div className="text-sm text-base-content/50">
+                {selectedWardName}
+              </div>
+            )}
+          </div>
+
+          <PatientList
+            patients={patients}
+            loading={patientsLoading}
+            error={patientsError}
+            onPatientClick={handlePatientClick}
+          />
+        </section>
+      </div>
     </main>
   );
 }

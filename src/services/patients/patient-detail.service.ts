@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+
 import type {
   PatientDetailData,
   PatientDetail,
@@ -9,48 +10,79 @@ import type {
   ActivityLog,
 } from "@/types/patient-detail";
 
+
+
 export async function getPatientDetail(
-  patientId: string
-): Promise<PatientDetailData> {
+  uwid: string
+): Promise<PatientDetailData | null> {
   const supabase = createClient();
 
   // -------------------------
-  // Patient
+  // Patient + Ward
   // -------------------------
 
-  const { data: patientData, error: patientError } =
+  const { data: patientWardData, error: patientWardError } =
     await supabase
-      .from("patients")
+      .from("patients_on_wards")
       .select(`
-        id,
-        first_name,
-        last_name,
-        ward_id,
+        uwid,
+        opd,
         room_number,
         bed_number,
         status,
-        wards (
+        monitor_status,
+        saline_status,
+
+        patients!fk_patients_on_wards_patient (
+          opd,
+          first_name,
+          last_name,
+          gender,
+          birthdate,
+          phone,
+          contact_person
+        ),
+
+        wards!fk_patients_on_wards_ward (
+          wid,
           name
         )
       `)
-      .eq("id", patientId)
+      .eq("uwid", uwid)
       .single();
 
-  if (patientError) {
-    throw new Error(patientError.message);
+  if (patientWardError) {
+    throw new Error(patientWardError.message);
   }
 
-  const patient = {
-    id: patientData.id,
+  if (!patientWardData) {
+    return null;
+  }
+
+  const patientData = patientWardData.patients;
+  const wardData = patientWardData.wards;
+
+  if (!patientData || !wardData) {
+    throw new Error("Patient or ward data not found");
+  }
+
+  const patient: PatientDetail = {
+    id: patientData.opd,
+    uwid: patientWardData.uwid,
+    opd: patientData.opd,
     first_name: patientData.first_name,
     last_name: patientData.last_name,
-    ward_id: patientData.ward_id,
-    ward_name:
-      patientData.wards?.name ?? "-",
-    room_number: patientData.room_number,
-    bed_number: patientData.bed_number,
-    status: patientData.status,
-  } as PatientDetail;
+    gender: patientData.gender,
+    birthdate: patientData.birthdate,
+    phone: patientData.phone,
+    contact_person: patientData.contact_person,
+    ward_name: wardData.name,
+    room_number: patientWardData.room_number,
+    bed_number: patientWardData.bed_number,
+    status: patientWardData.status,
+    monitor_status: patientWardData.monitor_status,
+    saline_status: patientWardData.saline_status,
+  };
 
   // -------------------------
   // Devices
@@ -67,15 +99,14 @@ export async function getPatientDetail(
         installed_at,
         last_seen
       `)
-      .eq("patient_id", patientId)
+      .eq("uwid", uwid)
       .order("device_type");
 
   if (devicesError) {
     throw new Error(devicesError.message);
   }
 
-  const devices =
-    (devicesData ?? []) as PatientDevice[];
+  const devices = (devicesData ?? []) as PatientDevice[];
 
   // -------------------------
   // Saline
@@ -91,13 +122,15 @@ export async function getPatientDetail(
 
   if (salineDevice) {
     const { data, error } = await supabase
-      .from("saline_data")
+      .from("saline")
       .select(`
-        percentage,
-        measured_at
+        device_id,
+        measure_value,
+        measure_at
       `)
-      .eq("device_id", salineDevice.id)
-      .order("measured_at", {
+      .eq("uwid", uwid)
+      .eq("device_id", salineDevice.device_uid)
+      .order("measure_at", {
         ascending: false,
       })
       .limit(1)
@@ -126,15 +159,14 @@ export async function getPatientDetail(
     const { data, error } = await supabase
       .from("respiratory_data")
       .select(`
-        tidals_volums,
+        device_id,
         spo2,
         heart_rate,
-        peak_pressure,
-        leak,
-        measured_at
+        measure_at
       `)
-      .eq("device_id", respiratoryDevice.id)
-      .order("measured_at", {
+      .eq("uwid", uwid)
+      .eq("device_id", respiratoryDevice.device_uid)
+      .order("measure_at", {
         ascending: false,
       })
       .limit(1)
@@ -144,8 +176,7 @@ export async function getPatientDetail(
       throw new Error(error.message);
     }
 
-    respiratory =
-      data as RespiratoryData | null;
+    respiratory = data as RespiratoryData | null;
   }
 
   // -------------------------
@@ -156,21 +187,19 @@ export async function getPatientDetail(
     await supabase
       .from("alerts")
       .select(`
-        id,
-        type,
+        alert_id,
+        aid,
+        uwid,
+        device_id,
         severity,
-        title,
-        message,
         value,
-        threshold,
         status,
         created_at,
-        acknowledged_at
+        acknowledged_at,
+        acknowledged_by,
+        resolved_at
       `)
-      .eq("patient_id", patientId)
-      .order("severity", {
-        ascending: false,
-      })
+      .eq("uwid", uwid)
       .order("created_at", {
         ascending: false,
       });
@@ -179,8 +208,7 @@ export async function getPatientDetail(
     throw new Error(alertsError.message);
   }
 
-  const alerts =
-    (alertsData ?? []) as PatientAlert[];
+  const alerts = (alertsData ?? []) as PatientAlert[];
 
   // -------------------------
   // Activity Logs
@@ -188,14 +216,17 @@ export async function getPatientDetail(
 
   const { data: activitiesData, error: activitiesError } =
     await supabase
-      .from("activity_logs")
+      .from("activity_log")
       .select(`
-        id,
-        action,
+        act_id,
+        uwid,
+        uid,
+        action_type,
         description,
+        status,
         created_at
       `)
-      .eq("patient_id", patientId)
+      .eq("uwid", uwid)
       .order("created_at", {
         ascending: false,
       })
@@ -205,8 +236,7 @@ export async function getPatientDetail(
     throw new Error(activitiesError.message);
   }
 
-  const activities =
-    (activitiesData ?? []) as ActivityLog[];
+  const activities = (activitiesData ?? []) as ActivityLog[];
 
   return {
     patient,

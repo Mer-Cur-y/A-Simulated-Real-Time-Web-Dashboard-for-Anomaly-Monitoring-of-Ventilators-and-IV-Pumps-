@@ -1,20 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
-
-export async function getWards() {
-  const supabase = createClient();
-
+import type { Ward } from "@/types/ward";
+const supabase = createClient();
+export async function getWards(): Promise<Ward[]> {
   const { data, error } = await supabase
     .from("wards")
-    .select(`
-      id,
-      name,
-      description
-    `)
-    .order("name");
-
+    .select("*")
+    .order("name", { ascending: true });
   if (error) {
     throw new Error(error.message);
   }
-
-  return data;
+  return data ?? [];
 }

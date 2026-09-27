@@ -4,38 +4,40 @@ import type { Ward } from "@/types/ward";
 
 interface WardFilterProps {
   wards: Ward[];
-  value: string;
-  onChange: (value: string) => void;
+  selectedWardId: string;
+  onWardChange: (wardId: string) => void;
 }
 
 export default function WardFilter({
   wards,
-  value,
-  onChange,
+  selectedWardId,
+  onWardChange,
 }: WardFilterProps) {
   return (
-    <div className="form-control w-full max-w-xs">
-      <label className="label">
-        <span className="label-text">
-          Ward
-        </span>
+    <div className="flex items-center gap-3">
+      <label
+        htmlFor="ward-filter"
+        className="text-sm font-medium"
+      >
+        Ward
       </label>
 
       <select
-        className="select select-bordered"
-        value={value}
-        onChange={(e) =>
-          onChange(e.target.value)
+        id="ward-filter"
+        value={selectedWardId}
+        onChange={(event) =>
+          onWardChange(event.target.value)
         }
+        className="select select-bordered min-w-48"
       >
         <option value="all">
-          ทั้งหมดที่ฉันรับผิดชอบ
+          ทุก Ward
         </option>
 
         {wards.map((ward) => (
           <option
-            key={ward.id}
-            value={ward.id}
+            key={ward.wid}
+            value={ward.wid}
           >
             {ward.name}
           </option>

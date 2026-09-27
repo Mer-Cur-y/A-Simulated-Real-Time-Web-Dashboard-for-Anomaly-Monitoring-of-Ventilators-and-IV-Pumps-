@@ -1,111 +1,135 @@
-import Link from "next/link";
+"use client";
 
 import type { PatientDashboard } from "@/types/patient";
 
 interface PatientCardProps {
   patient: PatientDashboard;
+  onClick?: (patient: PatientDashboard) => void;
 }
+
+const monitorStatusLabel = {
+  normal: "ปกติ",
+  warning: "เฝ้าระวัง",
+  critical: "วิกฤต",
+};
+
+const salineStatusLabel = {
+  normal: "ปกติ",
+  low: "ใกล้หมด",
+  empty: "หมดแล้ว",
+};
 
 export default function PatientCard({
   patient,
+  onClick,
 }: PatientCardProps) {
   return (
-    <Link
-      href={`/dashboard/patients/${patient.patient_id}`}
-      className="block"
+    <button
+      type="button"
+      onClick={() => onClick?.(patient)}
+      className="w-full rounded-xl border border-base-300 bg-base-100 p-4 text-left shadow-sm transition hover:border-base-content/20 hover:shadow-md"
     >
-      <div className="card bg-base-100 border border-base-300 transition hover:shadow-md">
-        <div className="card-body">
-
-          {/* Patient Information */}
-          <div className="flex items-start justify-between">
-
-            <div>
-              <h2 className="text-lg font-bold">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+        {/* Patient */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold">
                 {patient.first_name} {patient.last_name}
               </h2>
 
-              <p className="text-sm opacity-60">
-                {patient.ward_name}
-                {" • "}
-                ห้อง {patient.room_number ?? "-"}
-                {" • "}
-                เตียง {patient.bed_number ?? "-"}
+              <p className="mt-1 text-sm text-base-content/60">
+                OPD: {patient.opd}
               </p>
             </div>
 
             <span
-              className={`
-                badge
-                ${
-                  patient.status === "critical"
-                    ? "badge-error"
-                    : patient.status === "warning"
-                      ? "badge-warning"
-                      : "badge-success"
-                }
-              `}
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
+                patient.monitor_status === "critical"
+                  ? "bg-error/10 text-error"
+                  : patient.monitor_status === "warning"
+                    ? "bg-warning/10 text-warning"
+                    : "bg-success/10 text-success"
+              }`}
             >
-              {patient.status}
+              {monitorStatusLabel[patient.monitor_status]}
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-base-content/60">
+            <span>
+              {patient.ward_name}
             </span>
 
+            <span>
+              ห้อง {patient.room_number ?? "-"}
+            </span>
+
+            <span>
+              เตียง {patient.bed_number ?? "-"}
+            </span>
+          </div>
+        </div>
+
+        {/* Respiratory */}
+        <div className="flex shrink-0 gap-3">
+          <div className="min-w-28 rounded-lg bg-base-200 px-4 py-3">
+            <p className="text-xs text-base-content/60">
+              SpO₂
+            </p>
+
+            <p className="mt-1 text-lg font-semibold">
+              {patient.spo2 !== null
+                ? `${patient.spo2}%`
+                : "-"}
+            </p>
           </div>
 
-          <div className="divider my-1" />
+          <div className="min-w-28 rounded-lg bg-base-200 px-4 py-3">
+            <p className="text-xs text-base-content/60">
+              Heart Rate
+            </p>
 
-          {/* Sensor Information */}
-          <div className="grid grid-cols-3 gap-3">
+            <p className="mt-1 text-lg font-semibold">
+              {patient.heart_rate !== null
+                ? `${patient.heart_rate} bpm`
+                : "-"}
+            </p>
+          </div>
+        </div>
 
-            <div>
-              <p className="text-xs opacity-60">
-                SpO₂
-              </p>
+        {/* Saline */}
+        <div className="flex min-w-36 shrink-0 items-center justify-between gap-4 rounded-lg border border-base-300 px-4 py-3">
+          <div>
+            <p className="text-xs text-base-content/60">
+              สารน้ำ
+            </p>
 
-              <p className="text-lg font-semibold">
-                {patient.spo2 !== null
-                  ? `${patient.spo2}%`
-                  : "-"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs opacity-60">
-                Heart Rate
-              </p>
-
-              <p className="text-lg font-semibold">
-                {patient.heart_rate !== null
-                  ? `${patient.heart_rate} bpm`
-                  : "-"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs opacity-60">
-                Saline
-              </p>
-
-              <p className="text-lg font-semibold">
-                {patient.saline_percentage !== null
-                  ? `${patient.saline_percentage}%`
-                  : "-"}
-              </p>
-            </div>
-
+            <p className="mt-1 text-lg font-semibold">
+              {patient.saline_value !== null
+                ? `${patient.saline_value}%`
+                : "-"}
+            </p>
           </div>
 
-          {/* Alerts */}
-          {patient.active_alert_count > 0 && (
-            <div className="mt-2">
-              <span className="text-sm text-error">
-                {patient.active_alert_count} Active Alert
-                {patient.active_alert_count > 1 ? "s" : ""}
-              </span>
-            </div>
-          )}
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              patient.saline_status === "empty"
+                ? "bg-error/10 text-error"
+                : patient.saline_status === "low"
+                  ? "bg-warning/10 text-warning"
+                  : "bg-success/10 text-success"
+            }`}
+          >
+            {salineStatusLabel[patient.saline_status]}
+          </span>
+        </div>
 
+        {/* Arrow */}
+        <div className="hidden text-xl text-base-content/40 lg:block">
+          →
         </div>
       </div>
-    </Link>
+    </button>
   );
 }
