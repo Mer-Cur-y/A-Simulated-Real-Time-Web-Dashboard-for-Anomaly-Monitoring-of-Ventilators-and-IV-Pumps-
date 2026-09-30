@@ -1,4 +1,4 @@
-import PatientDetailMock from "@/components/dashboard/patients/PatientDetailMock";
+import PatientDetail from "@/components/dashboard/patients/PatientDetail";
 
 interface PatientDetailPageProps {
   params: Promise<{
@@ -9,7 +9,7 @@ interface PatientDetailPageProps {
 export default async function PatientDetailPage({
   params,
 }: PatientDetailPageProps) {
-  await params;
+  const { uwid } = await params;
 
-  return <PatientDetailMock />;
+  return <PatientDetail uwid={uwid} />;
 }
