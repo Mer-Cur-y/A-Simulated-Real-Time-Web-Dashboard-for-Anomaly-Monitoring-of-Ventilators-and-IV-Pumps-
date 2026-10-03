@@ -1,9 +1,16 @@
 "use client";
+import PatientDevices from "./PatientDevices";
 import RespiratoryGraph from "./RespiratoryGraph";
-
+import { acknowledgeAlert } from "@/services/alerts/alert.service";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+
+import {
+  getPatientActivities,
+  createActivityNote,
+  type ActivityLog,
+} from "@/services/activity/activity.service";
 
 import {
   getPatientDetail,
@@ -97,6 +104,37 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
 
   const [error, setError] = useState<string | null>(null);
 
+  const [acknowledgingAlert, setAcknowledgingAlert] = useState<string | null>(
+    null,
+  );
+  const [activityNote, setActivityNote] = useState("");
+  const [savingActivityNote, setSavingActivityNote] = useState(false);
+
+  const [activities, setActivities] = useState<ActivityLog[]>([]);
+
+  const [activityLoading, setActivityLoading] = useState(true);
+
+  // ========================================
+  // LOAD PATIENT
+  // ========================================
+  useEffect(() => {
+    async function loadActivities() {
+      try {
+        setActivityLoading(true);
+
+        const result = await getPatientActivities(uwid);
+
+        setActivities(result);
+      } catch (err) {
+        console.error("Load activity error:", err);
+      } finally {
+        setActivityLoading(false);
+      }
+    }
+
+    loadActivities();
+  }, [uwid]);
+
   useEffect(() => {
     async function loadPatient() {
       try {
@@ -118,143 +156,179 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
     loadPatient();
   }, [uwid]);
 
+  // ========================================
+  // ALERT REALTIME
+  // ========================================
+
   useEffect(() => {
-  const supabase = createClient();
+    const supabase = createClient();
 
-  const channel = supabase
-    .channel(`patient-detail-${uwid}`)
+    const channel = supabase
+      .channel(`patient-alerts-${uwid}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "alerts",
+          filter: `uwid=eq.${uwid}`,
+        },
+        (payload) => {
+          console.log("PATIENT ALERT REALTIME:", payload);
 
-    // ========================================
-    // RESPIRATORY REALTIME
-    // ========================================
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "respiratory_data",
-        filter: `uwid=eq.${uwid}`,
-      },
-      (payload) => {
-        console.log("PATIENT RESPIRATORY REALTIME:", payload);
+          setData((current) => {
+            if (!current) return current;
 
-        const newData = payload.new as {
-          uwid: string;
-          device_id: string;
-          spo2: number | null;
-          heart_rate: number | null;
-          measure_at: string;
-        };
+            // INSERT
+            if (payload.eventType === "INSERT") {
+              const newAlert =
+                payload.new as PatientDetailData["alerts"][number];
 
-        setData((current) => {
-          if (!current) return current;
+              return {
+                ...current,
+                alerts: [newAlert, ...current.alerts],
+              };
+            }
 
-          return {
-            ...current,
+            // UPDATE
+            if (payload.eventType === "UPDATE") {
+              const updatedAlert =
+                payload.new as PatientDetailData["alerts"][number];
 
-            respiratory: {
-              ...current.respiratory,
-              ...newData,
-            },
+              return {
+                ...current,
+                alerts: current.alerts.map((alert) =>
+                  alert.alert_id === updatedAlert.alert_id
+                    ? updatedAlert
+                    : alert,
+                ),
+              };
+            }
 
-            patient: {
-              ...current.patient,
-              // ค่า respiratory ใหม่จะถูกใช้ในส่วน UI
-            },
-          };
-        });
-      },
-    )
+            // DELETE
+            if (payload.eventType === "DELETE") {
+              const deletedAlert =
+                payload.old as PatientDetailData["alerts"][number];
 
-    // ========================================
-    // SALINE REALTIME
-    // ========================================
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "saline",
-        filter: `uwid=eq.${uwid}`,
-      },
-      (payload) => {
-        console.log("PATIENT SALINE REALTIME:", payload);
+              return {
+                ...current,
+                alerts: current.alerts.filter(
+                  (alert) => alert.alert_id !== deletedAlert.alert_id,
+                ),
+              };
+            }
 
-        const newData = payload.new as {
-          uwid: string;
-          device_id: string;
-          measure_value: number;
-          measure_at: string;
-        };
+            return current;
+          });
+        },
+      )
+      .subscribe((status) => {
+        console.log("Patient Alert Realtime:", status);
+      });
 
-        setData((current) => {
-          if (!current) return current;
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [uwid]);
 
-          return {
-            ...current,
+  // ========================================
+  // ACKNOWLEDGE ALERT
+  // ========================================
 
-            saline: {
-              ...current.saline,
-              ...newData,
-            },
-          };
-        });
-      },
-    )
+  useEffect(() => {
+    const supabase = createClient();
 
-    // ========================================
-    // PATIENT STATUS REALTIME
-    // ========================================
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "patients_on_wards",
-        filter: `uwid=eq.${uwid}`,
-      },
-      (payload) => {
-        console.log("PATIENT STATUS REALTIME:", payload);
+    const channel = supabase
+      .channel(`patient-activity-${uwid}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "activity_log",
+          filter: `uwid=eq.${uwid}`,
+        },
+        (payload) => {
+          console.log("PATIENT ACTIVITY REALTIME:", payload);
 
-        const newData = payload.new as {
-          uwid: string;
-          monitor_status:
-            | "normal"
-            | "warning"
-            | "critical";
-          saline_status:
-            | "normal"
-            | "low"
-            | "empty";
-        };
+          if (payload.eventType === "INSERT") {
+            const newActivity = payload.new as ActivityLog;
 
-        setData((current) => {
-          if (!current) return current;
+            setActivities((current) => [newActivity, ...current]);
+          }
 
-          return {
-            ...current,
+          if (payload.eventType === "UPDATE") {
+            const updatedActivity = payload.new as ActivityLog;
 
-            patient: {
-              ...current.patient,
-              monitor_status: newData.monitor_status,
-              saline_status: newData.saline_status,
-            },
-          };
-        });
-      },
-    )
+            setActivities((current) =>
+              current.map((activity) =>
+                activity.act_id === updatedActivity.act_id
+                  ? updatedActivity
+                  : activity,
+              ),
+            );
+          }
 
-    // ========================================
-    // SUBSCRIBE
-    // ========================================
-    .subscribe((status) => {
-      console.log("Patient Detail Realtime:", status);
-    });
+          if (payload.eventType === "DELETE") {
+            const deletedActivity = payload.old as ActivityLog;
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [uwid]);
+            setActivities((current) =>
+              current.filter(
+                (activity) => activity.act_id !== deletedActivity.act_id,
+              ),
+            );
+          }
+        },
+      )
+      .subscribe((status) => {
+        console.log("Patient Activity Realtime:", status);
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [uwid]);
+
+  async function handleAcknowledgeAlert(alertId: string) {
+    try {
+      setAcknowledgingAlert(alertId);
+
+      await acknowledgeAlert(alertId);
+    } catch (err) {
+      console.error("Acknowledge alert error:", err);
+
+      alert(err instanceof Error ? err.message : "ไม่สามารถรับทราบ Alert ได้");
+    } finally {
+      setAcknowledgingAlert(null);
+    }
+  }
+  async function handleCreateActivityNote() {
+    const description = activityNote.trim();
+
+    if (!description) {
+      return;
+    }
+
+    try {
+      setSavingActivityNote(true);
+
+      await createActivityNote(uwid, description);
+
+      setActivityNote("");
+    } catch (err) {
+      console.error("Create activity note error:", err);
+
+      alert(
+        err instanceof Error ? err.message : "ไม่สามารถบันทึกการดำเนินการได้",
+      );
+    } finally {
+      setSavingActivityNote(false);
+    }
+  }
+
+  // ========================================
+  // LOADING
+  // ========================================
 
   if (loading) {
     return (
@@ -271,6 +345,10 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
       </main>
     );
   }
+
+  // ========================================
+  // ERROR
+  // ========================================
 
   if (error) {
     return (
@@ -295,6 +373,10 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
     );
   }
 
+  // ========================================
+  // NOT FOUND
+  // ========================================
+
   if (!data) {
     return (
       <main className="min-h-screen bg-[#f3faf7] p-6">
@@ -313,6 +395,7 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
     <main className="min-h-screen bg-[#f3faf7] p-4 md:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
+
         <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.05)] md:p-6">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-4">
@@ -360,6 +443,7 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
         </section>
 
         {/* Metrics */}
+
         <section className="grid gap-4 md:grid-cols-3">
           <MetricCard
             title="SpO₂"
@@ -382,13 +466,17 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
             status={patient.saline_status}
           />
         </section>
+        {/* JSX */}
+        <PatientDevices uwid={patient.uwid} />
+        {/* Graph */}
 
-        {/* Graph Placeholder */}
         <RespiratoryGraph uwid={patient.uwid} />
 
         {/* Patient + Devices */}
+
         <section className="grid gap-6 lg:grid-cols-2">
           {/* Patient information */}
+
           <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.05)]">
             <h2 className="text-lg font-semibold text-slate-800">
               ข้อมูลผู้ป่วย
@@ -446,6 +534,7 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
           </div>
 
           {/* Devices */}
+
           <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.05)]">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-800">Devices</h2>
@@ -503,6 +592,7 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
         </section>
 
         {/* Alerts */}
+
         <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.05)]">
           <div className="flex items-center justify-between">
             <div>
@@ -530,20 +620,175 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
                     key={alert.alert_id}
                     className="flex items-center justify-between rounded-xl border border-slate-100 p-4"
                   >
+                    {/* Alert information */}
+
                     <div>
                       <StatusBadge status={alert.severity} />
 
                       <p className="mt-2 text-sm text-slate-600">
                         ค่า {alert.value ?? "-"}
                       </p>
+
+                      <p className="mt-1 text-xs text-slate-400">
+                        สถานะ: {alert.status}
+                      </p>
                     </div>
 
-                    <div className="text-right text-xs text-slate-400">
-                      <p>{alert.status}</p>
+                    {/* Alert action */}
 
-                      <p className="mt-1">
-                        {new Date(alert.created_at).toLocaleString("th-TH")}
-                      </p>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="text-right text-xs text-slate-400">
+                        <p>
+                          {new Date(alert.created_at).toLocaleString("th-TH")}
+                        </p>
+                      </div>
+
+                      {/* Active */}
+
+                      {alert.status === "active" && (
+                        <button
+                          onClick={() => handleAcknowledgeAlert(alert.alert_id)}
+                          disabled={acknowledgingAlert === alert.alert_id}
+                          className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {acknowledgingAlert === alert.alert_id
+                            ? "กำลังบันทึก..."
+                            : "รับทราบ"}
+                        </button>
+                      )}
+
+                      {/* Acknowledged */}
+
+                      {alert.status === "acknowledged" && (
+                        <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                          รับทราบแล้ว
+                        </span>
+                      )}
+
+                      {/* Resolved */}
+
+                      {alert.status === "resolved" && (
+                        <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
+                          แก้ไขแล้ว
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Care Note */}
+
+        <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.05)]">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">
+              บันทึกการดูแล
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-400">
+              บันทึกรายละเอียดการดำเนินการของเจ้าหน้าที่
+            </p>
+          </div>
+
+          <div className="mt-5">
+            <textarea
+              value={activityNote}
+              onChange={(e) => setActivityNote(e.target.value)}
+              placeholder="เช่น ให้ออกซิเจน 2 L/min และติดตาม SpO₂ ทุก 15 นาที"
+              rows={4}
+              maxLength={1000}
+              className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+            />
+
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                {activityNote.length}/1000
+              </span>
+
+              <button
+                onClick={handleCreateActivityNote}
+                disabled={
+                  savingActivityNote || activityNote.trim().length === 0
+                }
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingActivityNote ? "กำลังบันทึก..." : "บันทึก"}
+              </button>
+            </div>
+          </div>
+        </section>
+        {/* Activity Log */}
+
+        <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.05)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">
+                Activity Log
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-400">
+                ประวัติการดำเนินการของเจ้าหน้าที่
+              </p>
+            </div>
+
+            <span className="text-xs text-slate-400">
+              {activities.length} รายการ
+            </span>
+          </div>
+
+          <div className="mt-5">
+            {activityLoading ? (
+              <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-400">
+                กำลังโหลดประวัติ...
+              </div>
+            ) : activities.length === 0 ? (
+              <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-400">
+                ยังไม่มีประวัติการดำเนินการ
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {activities.map((activity) => (
+                  <div
+                    key={activity.act_id}
+                    className="rounded-xl border border-slate-100 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            {activity.action_type}
+                          </span>
+
+                          <span className="text-xs text-slate-400">
+                            {activity.status}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-sm text-slate-700">
+                          {activity.description ?? "ไม่มีรายละเอียด"}
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-400">
+                          เจ้าหน้าที่: {activity.uid}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs text-slate-400">
+                          {new Date(activity.created_at).toLocaleDateString(
+                            "th-TH",
+                          )}
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-400">
+                          {new Date(activity.created_at).toLocaleTimeString(
+                            "th-TH",
+                          )}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}

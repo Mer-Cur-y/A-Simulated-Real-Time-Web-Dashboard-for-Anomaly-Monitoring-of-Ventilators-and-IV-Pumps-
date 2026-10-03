@@ -1,5 +1,8 @@
 "use client";
-
+import DeviceOfflineAlerts from "@/components/devices/DeviceOfflineAlerts";
+import DeviceManagement from "@/components/devices/DeviceManagement";
+import DeviceMonitoring from "@/components/devices/DeviceMonitoring";
+import GlobalAlertNotification from "@/components/dashboard/alerts/GlobalAlertNotification";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -73,7 +76,10 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <div>
+          <div className="flex items-center gap-3">
+            {/* Global Alert Notification */}
+            <GlobalAlertNotification />
+
             {wardsError ? (
               <div className="text-sm text-error">{wardsError}</div>
             ) : (
@@ -121,6 +127,11 @@ export default function Dashboard() {
             onPatientClick={handlePatientClick}
           />
         </section>
+        <DeviceMonitoring />
+
+        <DeviceOfflineAlerts />
+
+        <DeviceManagement />
       </div>
     </main>
   );
