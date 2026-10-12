@@ -100,16 +100,69 @@ export async function getDeviceOfflineAlerts(): Promise<
 }
 
 export async function acknowledgeAlert(
-  alertId: string,
+  alertId: string
 ): Promise<void> {
   const { error } = await supabase.rpc(
     "acknowledge_alert",
     {
       p_alert_id: alertId,
-    },
+    }
   );
 
   if (error) {
     throw new Error(error.message);
   }
+}
+export interface PatientDeviceOfflineAlert {
+  alert_id: string;
+  uwid: string;
+  device_id: string | null;
+  severity: "info" | "warning" | "critical";
+  status: "active" | "acknowledged" | "resolved";
+  created_at: string;
+  alert_type: string;
+  alert_message: string | null;
+}
+
+export async function getPatientDeviceOfflineAlerts(
+  uwid: string
+): Promise<PatientDeviceOfflineAlert[]> {
+  const { data, error } = await supabase
+    .from("alerts")
+    .select(`
+      alert_id,
+      uwid,
+      device_id,
+      severity,
+      status,
+      created_at,
+      alert_types (
+        alert_type,
+        alert_message
+      )
+    `)
+    .eq("uwid", uwid)
+    .eq("status", "active")
+    .eq("alert_types.alert_type", "device_offline")
+    .order("created_at", {
+      ascending: false,
+    });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((item: any) => ({
+    alert_id: item.alert_id,
+    uwid: item.uwid,
+    device_id: item.device_id,
+    severity: item.severity,
+    status: item.status,
+    created_at: item.created_at,
+    alert_type:
+      item.alert_types?.alert_type ??
+      "device_offline",
+    alert_message:
+      item.alert_types?.alert_message ?? null,
+  }));
 }

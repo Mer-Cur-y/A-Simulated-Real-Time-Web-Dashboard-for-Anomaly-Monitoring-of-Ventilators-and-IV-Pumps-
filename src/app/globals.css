@@ -1,2 +1,140 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: light --default;
+}
+
+@plugin "daisyui/theme" {
+  name: "light";
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: #FFFFFF;
+  --color-base-200: #F3F4F6;
+  --color-base-300: #E2E8F0;
+  --color-base-content: #0F172A;
+  --color-primary: #0F766E;
+  --color-primary-content: #FFFFFF;
+  --color-secondary: #475569;
+  --color-secondary-content: #FFFFFF;
+  --color-accent: #0D9488;
+  --color-accent-content: #FFFFFF;
+  --color-neutral: #1E293B;
+  --color-neutral-content: #F8FAFC;
+  --color-info: #1D4ED8;
+  --color-info-content: #FFFFFF;
+  --color-success: #15803D;
+  --color-success-content: #FFFFFF;
+  --color-warning: #B45309;
+  --color-warning-content: #FFFFFF;
+  --color-error: #B91C1C;
+  --color-error-content: #FFFFFF;
+}
+
+:root {
+  color-scheme: light;
+  --medical-page-bg: #F3F4F6;
+  --medical-card-bg: #FFFFFF;
+  --medical-border: #E2E8F0;
+  --medical-text: #0F172A;
+  --medical-muted: #64748B;
+}
+
+html {
+  min-height: 100%;
+  background: var(--medical-page-bg);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--medical-page-bg);
+  color: var(--medical-text);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  color: #FFFFFF;
+  background: #0F766E;
+}
+
+:focus-visible {
+  outline: 2px solid #0F766E;
+  outline-offset: 2px;
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Keep common dashboard surfaces consistent without overriding their layout. */
+.bg-base-100 {
+  --tw-shadow-color: rgb(15 23 42 / 0.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* Medical dashboard usability layer */
+:root {
+  --medical-radius-card: 1rem;
+  --medical-shadow-card: 0 1px 3px rgb(15 23 42 / 0.05), 0 8px 24px rgb(15 23 42 / 0.035);
+}
+
+input, select, textarea {
+  color: #0F172A;
+}
+input::placeholder, textarea::placeholder {
+  color: #64748B;
+  opacity: 1;
+}
+
+input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+  min-height: 2.65rem;
+}
+
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Recharts SVG attributes can be overridden by broad theme CSS; keep metric colors stable. */
+.recharts-wrapper .recharts-line path[stroke="#1D4ED8"] {
+  stroke: #1D4ED8 !important;
+}
+.recharts-wrapper .recharts-line path[stroke="#C2410C"] {
+  stroke: #C2410C !important;
+}
+.recharts-wrapper .recharts-cartesian-grid-horizontal line,
+.recharts-wrapper .recharts-cartesian-grid-vertical line {
+  stroke: #E2E8F0;
+}
+.recharts-wrapper .recharts-tooltip-wrapper {
+  outline: none;
+}
+
+/* Consistent keyboard focus, including links styled as cards. */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgb(13 148 136 / 0.45);
+  outline-offset: 2px;
+}

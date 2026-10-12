@@ -113,7 +113,7 @@ export async function deleteDevice(
   }
 }
 export async function getPatientDevices(
-  uwid: string,
+  uwid: string
 ): Promise<Device[]> {
   const { data, error } = await supabase
     .from("device_monitoring")

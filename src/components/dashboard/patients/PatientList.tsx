@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { PatientDashboard } from "@/types/patient";
@@ -16,13 +17,16 @@ export default function PatientList({
   error = null,
   onPatientClick,
 }: PatientListProps) {
+  const gridClass =
+    "grid min-w-0 grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+
   if (loading) {
     return (
-      <div className="flex flex-col gap-3">
-        {Array.from({ length: 6 }).map((_, index) => (
+      <div className={gridClass}>
+        {Array.from({ length: 8 }).map((_, index) => (
           <div
             key={index}
-            className="h-32 w-full animate-pulse rounded-xl bg-base-200"
+            className="h-48 min-w-0 animate-pulse rounded-2xl border border-base-300 bg-base-100"
           />
         ))}
       </div>
@@ -31,12 +35,11 @@ export default function PatientList({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-error/30 bg-error/5 p-6 text-center">
+      <div className="w-full min-w-0 rounded-2xl border border-error/30 bg-error/5 p-6 text-center">
         <p className="font-medium text-error">
           ไม่สามารถโหลดข้อมูลผู้ป่วยได้
         </p>
-
-        <p className="mt-1 text-sm text-base-content/60">
+        <p className="mt-1 break-words text-sm text-base-content/60">
           {error}
         </p>
       </div>
@@ -45,26 +48,27 @@ export default function PatientList({
 
   if (patients.length === 0) {
     return (
-      <div className="rounded-xl border border-base-300 bg-base-100 p-10 text-center">
-        <p className="font-medium">
-          ไม่พบข้อมูลผู้ป่วย
-        </p>
-
+      <div className="w-full min-w-0 rounded-2xl border border-base-300 bg-base-100 p-10 text-center">
+        <p className="font-medium">ไม่พบข้อมูลผู้ป่วย</p>
         <p className="mt-1 text-sm text-base-content/60">
-          ลองเปลี่ยน Ward หรือเงื่อนไขการกรอง
+          ลองเปลี่ยนคำค้นหา สถานะ หรือ Ward
         </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={gridClass}>
       {patients.map((patient) => (
-        <PatientCard
+        <div
           key={patient.uwid}
-          patient={patient}
-          onClick={onPatientClick}
-        />
+          className="h-full min-w-0 [&>*]:h-full [&>*]:w-full [&>*]:min-w-0"
+        >
+          <PatientCard
+            patient={patient}
+            onClick={onPatientClick}
+          />
+        </div>
       ))}
     </div>
   );

@@ -44,14 +44,14 @@ export async function getPatientActivities(
 
 export async function createActivityNote(
   uwid: string,
-  description: string,
+  description: string
 ): Promise<string> {
   const { data, error } = await supabase.rpc(
     "create_activity_note",
     {
       p_uwid: uwid,
       p_description: description,
-    },
+    }
   );
 
   if (error) {
@@ -60,3 +60,4 @@ export async function createActivityNote(
 
   return data;
 }
+

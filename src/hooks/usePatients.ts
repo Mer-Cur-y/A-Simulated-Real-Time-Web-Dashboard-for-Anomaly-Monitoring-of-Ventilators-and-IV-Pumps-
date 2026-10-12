@@ -21,6 +21,7 @@ interface UsePatientsResult {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
+  realtimeConnected: boolean;
 }
 
 export function usePatients(
@@ -31,6 +32,7 @@ export function usePatients(
   const [patients, setPatients] = useState<PatientDashboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   const loadPatients = useCallback(async () => {
     try {
@@ -98,6 +100,7 @@ export function usePatients(
           table: "respiratory_data",
         },
         (payload) => {
+          if (payload.eventType === "DELETE") return;
           const newData = payload.new as {
             uwid: string;
             spo2: number | null;
@@ -127,6 +130,7 @@ export function usePatients(
           table: "saline",
         },
         (payload) => {
+          if (payload.eventType === "DELETE") return;
           console.log("SALINE REALTIME:", payload);
 
           const newData = payload.new as {
@@ -156,6 +160,7 @@ export function usePatients(
           table: "patients_on_wards",
         },
         (payload) => {
+          if (payload.eventType === "DELETE") return;
           console.log("STATUS REALTIME:", payload);
 
           const newData = payload.new as {
@@ -179,6 +184,7 @@ export function usePatients(
       )
 
       .subscribe((status) => {
+        setRealtimeConnected(status === "SUBSCRIBED");
         console.log("Dashboard Realtime:", status);
       });
 
@@ -192,5 +198,6 @@ export function usePatients(
     loading,
     error,
     refetch: loadPatients,
+    realtimeConnected,
   };
 }

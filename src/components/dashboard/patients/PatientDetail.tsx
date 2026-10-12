@@ -1,6 +1,6 @@
 "use client";
-import PatientDevices from "./PatientDevices";
 import RespiratoryGraph from "./RespiratoryGraph";
+import PatientDeviceOfflineAlert from "./PatientDeviceOfflineAlert";
 import { acknowledgeAlert } from "@/services/alerts/alert.service";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -111,8 +111,9 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
   const [savingActivityNote, setSavingActivityNote] = useState(false);
 
   const [activities, setActivities] = useState<ActivityLog[]>([]);
-
   const [activityLoading, setActivityLoading] = useState(true);
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
+  const [showAllActivities, setShowAllActivities] = useState(false);
 
   // ========================================
   // LOAD PATIENT
@@ -133,6 +134,76 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
     }
 
     loadActivities();
+  }, [uwid]);
+
+  // ========================================
+  // SENSOR DATA REALTIME
+  // ========================================
+  useEffect(() => {
+    const supabase = createClient();
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+    async function refreshPatient() {
+      try {
+        const result = await getPatientDetail(uwid);
+        setData(result);
+      } catch (error) {
+        console.error("Refresh patient sensor data error:", error);
+      }
+    }
+
+    // หน่วงเล็กน้อยเพื่อให้ฐานข้อมูลทำ Trigger
+    // อัปเดตสถานะเสร็จก่อนโหลดข้อมูลใหม่
+    function scheduleRefresh() {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+
+      refreshTimer = setTimeout(() => {
+        void refreshPatient();
+      }, 300);
+    }
+
+    const respiratoryChannel = supabase
+      .channel(`patient-respiratory-${uwid}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "respiratory_data",
+          filter: `uwid=eq.${uwid}`,
+        },
+        scheduleRefresh,
+      )
+      .subscribe((status) => {
+        console.log("Patient Respiratory Realtime:", status);
+      });
+
+    const salineChannel = supabase
+      .channel(`patient-saline-${uwid}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "saline",
+          filter: `uwid=eq.${uwid}`,
+        },
+        scheduleRefresh,
+      )
+      .subscribe((status) => {
+        console.log("Patient Saline Realtime:", status);
+      });
+
+    return () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+
+      supabase.removeChannel(respiratoryChannel);
+      supabase.removeChannel(salineChannel);
+    };
   }, [uwid]);
 
   useEffect(() => {
@@ -390,6 +461,10 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
   }
 
   const { patient, respiratory, saline, devices, alerts } = data;
+  const visibleAlerts = showAllAlerts ? alerts : alerts.slice(0, 4);
+  const visibleActivities = showAllActivities
+    ? activities
+    : activities.slice(0, 4);
 
   return (
     <main className="min-h-screen bg-[#f3faf7] p-4 md:p-6 lg:p-8">
@@ -467,8 +542,7 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
           />
         </section>
         {/* JSX */}
-        <PatientDevices uwid={patient.uwid} />
-        {/* Graph */}
+        <PatientDeviceOfflineAlert uwid={patient.uwid} />
 
         <RespiratoryGraph uwid={patient.uwid} />
 
@@ -615,13 +689,12 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
               </div>
             ) : (
               <div className="space-y-3">
-                {alerts.map((alert) => (
+                {visibleAlerts.map((alert) => (
                   <div
                     key={alert.alert_id}
                     className="flex items-center justify-between rounded-xl border border-slate-100 p-4"
                   >
                     {/* Alert information */}
-
                     <div>
                       <StatusBadge status={alert.severity} />
 
@@ -635,15 +708,12 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
                     </div>
 
                     {/* Alert action */}
-
                     <div className="flex flex-col items-end gap-2">
                       <div className="text-right text-xs text-slate-400">
                         <p>
                           {new Date(alert.created_at).toLocaleString("th-TH")}
                         </p>
                       </div>
-
-                      {/* Active */}
 
                       {alert.status === "active" && (
                         <button
@@ -657,15 +727,11 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
                         </button>
                       )}
 
-                      {/* Acknowledged */}
-
                       {alert.status === "acknowledged" && (
                         <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
                           รับทราบแล้ว
                         </span>
                       )}
-
-                      {/* Resolved */}
 
                       {alert.status === "resolved" && (
                         <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-500">
@@ -675,6 +741,21 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
                     </div>
                   </div>
                 ))}
+
+                {/* แสดงเพิ่มเติม - ต้องอยู่นอก map */}
+                {alerts.length > 4 && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllAlerts((current) => !current)}
+                      className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
+                    >
+                      {showAllAlerts
+                        ? "แสดงน้อยลง"
+                        : `แสดงเพิ่มเติม (${alerts.length - 4})`}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -750,7 +831,7 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
               </div>
             ) : (
               <div className="space-y-3">
-                {activities.map((activity) => (
+                {visibleActivities.map((activity) => (
                   <div
                     key={activity.act_id}
                     className="rounded-xl border border-slate-100 p-4"
@@ -792,6 +873,23 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
                     </div>
                   </div>
                 ))}
+
+                {/* แสดงเพิ่มเติม - ต้องอยู่นอก map */}
+                {activities.length > 4 && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowAllActivities((current) => !current)
+                      }
+                      className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50"
+                    >
+                      {showAllActivities
+                        ? "แสดงน้อยลง"
+                        : `แสดงเพิ่มเติม (${activities.length - 4})`}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

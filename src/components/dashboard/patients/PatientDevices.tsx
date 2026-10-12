@@ -1,34 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { createClient } from "@/lib/supabase/client";
-import {
-  getPatientDevices,
-} from "@/services/devices/device.service";
+import { getPatientDevices } from "@/services/devices/device.service";
 import type { Device } from "@/types/device";
 
-function getTypeLabel(
-  type: Device["device_type"],
-) {
+interface PatientDevicesProps {
+  uwid: string;
+}
+
+function getTypeLabel(type: Device["device_type"]) {
   switch (type) {
     case "respiratory":
       return "Respiratory";
-
     case "saline":
       return "Saline";
-
     case "multi_sensor":
       return "Multi Sensor";
-
     default:
       return type;
   }
 }
 
-function getStatus(
-  status: Device["status"],
-) {
+function getStatus(status: Device["status"]) {
   switch (status) {
     case "online":
       return {
@@ -60,43 +54,29 @@ function getStatus(
   }
 }
 
-function formatLastSeen(
-  value: string | null,
-) {
+function formatLastSeen(value: string | null) {
   if (!value) {
     return "ยังไม่เคยเชื่อมต่อ";
   }
 
-  return new Date(value).toLocaleString(
-    "th-TH",
-    {
-      dateStyle: "short",
-      timeStyle: "medium",
-    },
-  );
-}
-
-interface PatientDevicesProps {
-  uwid: string;
+  return new Date(value).toLocaleString("th-TH", {
+    dateStyle: "short",
+    timeStyle: "medium",
+  });
 }
 
 export default function PatientDevices({
   uwid,
 }: PatientDevicesProps) {
-  const [devices, setDevices] = useState<Device[]>(
-    [],
-  );
-
-  const [loading, setLoading] =
-    useState(true);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
     async function loadDevices() {
       try {
-        const data =
-          await getPatientDevices(uwid);
+        const data = await getPatientDevices(uwid);
 
         if (mounted) {
           setDevices(data);
@@ -104,7 +84,7 @@ export default function PatientDevices({
       } catch (error) {
         console.error(
           "Failed to load patient devices:",
-          error,
+          error
         );
       } finally {
         if (mounted) {
@@ -117,28 +97,36 @@ export default function PatientDevices({
 
     const supabase = createClient();
 
+    /*
+     * ใช้ channel ชื่อไม่ซ้ำ
+     * ป้องกันปัญหา Realtime subscribe ซ้ำ
+     */
+    const channelName =
+      `patient-devices-${uwid}-${crypto.randomUUID()}`;
+
     const channel = supabase
-      .channel(
-        `patient-devices-${uwid}-${crypto.randomUUID()}`,
-      )
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "devices",
-          filter: `uwid=eq.${uwid}`,
         },
         async () => {
-          const data =
-            await getPatientDevices(uwid);
+          const data = await getPatientDevices(uwid);
 
           if (mounted) {
             setDevices(data);
           }
-        },
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(
+          "Patient Device Realtime:",
+          status
+        );
+      });
 
     return () => {
       mounted = false;
@@ -148,8 +136,12 @@ export default function PatientDevices({
 
   if (loading) {
     return (
-      <section className="rounded-2xl border border-base-300 bg-base-100 p-5">
-        <p className="text-sm text-base-content/60">
+      <section className="rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm">
+        <h2 className="text-lg font-bold">
+          Connected Devices
+        </h2>
+
+        <p className="mt-2 text-sm text-base-content/60">
           กำลังโหลดอุปกรณ์...
         </p>
       </section>
@@ -177,8 +169,7 @@ export default function PatientDevices({
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {devices.map((device) => {
-            const status =
-              getStatus(device.status);
+            const status = getStatus(device.status);
 
             return (
               <div
@@ -188,9 +179,7 @@ export default function PatientDevices({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold">
-                      {getTypeLabel(
-                        device.device_type,
-                      )}
+                      {getTypeLabel(device.device_type)}
                     </p>
 
                     <p className="mt-1 text-sm text-base-content/60">
@@ -215,9 +204,7 @@ export default function PatientDevices({
                   </p>
 
                   <p className="mt-1 text-sm">
-                    {formatLastSeen(
-                      device.last_seen,
-                    )}
+                    {formatLastSeen(device.last_seen)}
                   </p>
                 </div>
               </div>

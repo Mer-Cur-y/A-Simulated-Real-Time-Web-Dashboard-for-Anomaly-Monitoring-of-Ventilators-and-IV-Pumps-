@@ -109,10 +109,11 @@ export default function GlobalAlertNotification() {
         .from("alerts")
         .select("*")
         .eq("status", "active")
-        .order("created_at", {
-          ascending: false,
-        })
+        .order("created_at", { ascending: false })
         .limit(20);
+
+      console.log("Initial alerts:", alerts);
+      console.log("Initial alerts error:", error);
 
       if (error) {
         console.error("Load global alerts error:", error);
@@ -120,6 +121,8 @@ export default function GlobalAlertNotification() {
       }
 
       if (!alerts || alerts.length === 0) {
+        setNotifications([]);
+        setPopup(null);
         return;
       }
 
@@ -166,13 +169,16 @@ export default function GlobalAlertNotification() {
         (alertTypes ?? []).map((type) => [type.aid, type as AlertType]),
       );
 
-      setNotifications(
-        alerts.map((alert) => ({
-          ...(alert as AlertRow),
-          patient: patientMap.get(alert.uwid) ?? null,
-          alertType: alertTypeMap.get(alert.aid) ?? null,
-        })),
-      );
+      const items: NotificationItem[] = alerts.map((alert) => ({
+        ...(alert as AlertRow),
+        patient: patientMap.get(alert.uwid) ?? null,
+        alertType: alertTypeMap.get(alert.aid) ?? null,
+      }));
+
+      setNotifications(items);
+
+      // แสดง Popup ของ Alert ที่ยัง active ล่าสุด
+      setPopup(items[0] ?? null);
     }
 
     loadInitialAlerts();

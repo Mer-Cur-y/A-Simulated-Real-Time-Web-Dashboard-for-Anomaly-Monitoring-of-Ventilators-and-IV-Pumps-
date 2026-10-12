@@ -1,9 +1,9 @@
 "use client";
+
 import DeviceOfflineAlerts from "@/components/devices/DeviceOfflineAlerts";
 import DeviceManagement from "@/components/devices/DeviceManagement";
-import DeviceMonitoring from "@/components/devices/DeviceMonitoring";
-import GlobalAlertNotification from "@/components/dashboard/alerts/GlobalAlertNotification";
 import { useMemo, useState } from "react";
+import Topbar from "@/components/layout/Topbar";
 import { useRouter } from "next/navigation";
 
 import { usePatients } from "@/hooks/usePatients";
@@ -13,8 +13,12 @@ import StatusSummary from "./StatusSummary";
 import WardFilter from "./WardFilter";
 import PatientList from "./patients/PatientList";
 
+type PatientStatusFilter = "all" | "normal" | "warning" | "critical";
+
 export default function Dashboard() {
   const [selectedWardId, setSelectedWardId] = useState("all");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<PatientStatusFilter>("all");
 
   const router = useRouter();
 
@@ -24,6 +28,8 @@ export default function Dashboard() {
     patients,
     loading: patientsLoading,
     error: patientsError,
+    realtimeConnected,
+    refetch: refetchPatients,
   } = usePatients({
     wardId: selectedWardId,
   });
@@ -52,6 +58,51 @@ export default function Dashboard() {
     };
   }, [patients]);
 
+  const getPatientSeverity = (
+    patient: (typeof patients)[number],
+  ): "normal" | "warning" | "critical" => {
+    if (
+      patient.monitor_status === "critical" ||
+      patient.saline_status === "empty"
+    ) {
+      return "critical";
+    }
+
+    if (
+      patient.monitor_status === "warning" ||
+      patient.saline_status === "low"
+    ) {
+      return "warning";
+    }
+
+    return "normal";
+  };
+
+  const filteredPatients = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("th-TH");
+
+    return patients.filter((patient) => {
+      const searchableText = [
+        patient.first_name,
+        patient.last_name,
+        patient.uwid,
+        patient.ward_name,
+        patient.room_number,
+        patient.bed_number,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("th-TH");
+
+      const matchesSearch = !query || searchableText.includes(query);
+
+      const matchesStatus =
+        statusFilter === "all" || getPatientSeverity(patient) === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [patients, search, statusFilter]);
+
   const handlePatientClick = (patient: (typeof patients)[number]) => {
     router.push(`/dashboard/patients/${patient.uwid}`);
   };
@@ -63,36 +114,40 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-base-200 p-4 md:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold md:text-3xl">
-              Patient Dashboard
-            </h1>
+      <div className="mx-auto max-w-[1600px]">
+        <Topbar
+          title="Patient Dashboard"
+          description="ระบบติดตามและดูแลผู้ป่วย"
+        />
 
-            <p className="mt-1 text-sm text-base-content/60">
-              ระบบติดตามและดูแลผู้ป่วย
-            </p>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex items-center gap-2 text-sm">
+            <span className={`h-2.5 w-2.5 rounded-full ${realtimeConnected ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden="true" />
+            <span className="font-medium text-slate-700">{realtimeConnected ? "Live monitoring connected" : "Connecting to live monitoring…"}</span>
+            <span className="hidden text-slate-500 sm:inline">· ข้อมูลผู้ป่วยอัปเดตอัตโนมัติ</span>
           </div>
+          <button type="button" onClick={() => void refetchPatients()} disabled={patientsLoading} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50">
+            <span aria-hidden="true">↻</span>{patientsLoading ? "กำลังโหลด…" : "รีเฟรชข้อมูล"}
+          </button>
+        </div>
 
-          <div className="flex items-center gap-3">
-            {/* Global Alert Notification */}
-            <GlobalAlertNotification />
-
-            {wardsError ? (
-              <div className="text-sm text-error">{wardsError}</div>
-            ) : (
+        {/* Ward filter: แยกออกจาก Topbar */}
+        <div className="relative z-0 mt-4 flex w-full min-w-0 justify-end">
+          {wardsError ? (
+            <p className="text-sm text-error">{wardsError}</p>
+          ) : 
+          (
+            <div className="w-full min-w-0 sm:w-auto sm:min-w-64">
               <WardFilter
                 wards={wards}
                 selectedWardId={selectedWardId}
                 onWardChange={setSelectedWardId}
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        {/* Status Summary */}
+        {/* สรุปสถานะผู้ป่วย */}
         <StatusSummary
           total={summary.total}
           normal={summary.normal}
@@ -102,36 +157,66 @@ export default function Dashboard() {
           salineEmpty={summary.salineEmpty}
         />
 
-        {/* Patient List */}
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">รายชื่อผู้ป่วย</h2>
-
-              <p className="text-sm text-base-content/60">
-                แสดง {patients.length} ราย
-              </p>
-            </div>
-
-            {!wardsLoading && (
-              <div className="text-sm text-base-content/50">
-                {selectedWardName}
-              </div>
-            )}
+        {/* ค้นหาและกรองผู้ป่วย */}
+        <section className="mt-6 rounded-2xl border border-base-300 bg-base-100 p-4 shadow-sm md:p-5">
+          <div className="mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-semibold">รายชื่อผู้ป่วย</h2><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{filteredPatients.length} รายการ</span></div>
+            <p className="mt-1 text-sm text-base-content/60">
+              แสดง {filteredPatients.length} จาก {patients.length} ราย
+              {!wardsLoading && ` · ${selectedWardName}`}
+            </p>
           </div>
 
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+            <label className="input input-bordered flex w-full items-center gap-2">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="h-5 w-5 opacity-50"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-4-4" />
+              </svg>
+
+              <input
+                type="search"
+                className="grow"
+                placeholder="ค้นหาชื่อ นามสกุล หรือรหัสผู้ป่วย"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                aria-label="ค้นหาผู้ป่วย"
+              />
+            </label>
+
+            <select
+              className="select select-bordered w-full"
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as PatientStatusFilter)
+              }
+              aria-label="กรองตามสถานะผู้ป่วย"
+            >
+              <option value="all">ทุกสถานะ</option>
+              <option value="normal">Normal</option>
+              <option value="warning">Warning</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+        </section>
+
+        {/* การ์ดผู้ป่วย */}
+        <div className="mt-4">
           <PatientList
-            patients={patients}
+            patients={filteredPatients}
             loading={patientsLoading}
             error={patientsError}
             onPatientClick={handlePatientClick}
           />
-        </section>
-        <DeviceMonitoring />
-
-        <DeviceOfflineAlerts />
-
-        <DeviceManagement />
+        </div>
       </div>
     </main>
   );
