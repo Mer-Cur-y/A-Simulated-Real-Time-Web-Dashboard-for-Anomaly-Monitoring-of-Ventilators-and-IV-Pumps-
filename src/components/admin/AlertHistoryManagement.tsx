@@ -1,13 +1,16 @@
 "use client";
 
+import SearchableSelect from "@/components/ui/SearchableSelect";
+
+
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   getAlertHistory,
   type AlertHistoryItem,
   type AlertSeverity,
   type AlertStatus,
 } from "@/services/alerts/alert-history.service";
-import { acknowledgeAlert } from "@/services/alerts/alert.service";
 
 const severityLabels: Record<AlertSeverity, string> = {
   info: "ข้อมูล",
@@ -47,14 +50,12 @@ export default function AlertHistoryManagement() {
   const [alerts, setAlerts] = useState<AlertHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null);
 
   const [severityFilter, setSeverityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
 
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   const loadAlerts = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -79,6 +80,14 @@ export default function AlertHistoryManagement() {
 
   useEffect(() => {
     void loadAlerts();
+    const supabase = createClient();
+    const channel = supabase
+      .channel("admin-alert-history-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "alerts" }, () => {
+        void loadAlerts(true);
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
   }, [loadAlerts]);
 
   const filteredAlerts = useMemo(() => {
@@ -118,25 +127,6 @@ export default function AlertHistoryManagement() {
     (item) => item.status === "acknowledged"
   ).length;
 
-  async function handleAcknowledge(alert: AlertHistoryItem) {
-    setError("");
-    setMessage("");
-    setAcknowledgingId(alert.alert_id);
-
-    try {
-      await acknowledgeAlert(alert.alert_id);
-      setMessage("รับทราบการแจ้งเตือนแล้ว");
-      await loadAlerts(true);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "ไม่สามารถรับทราบการแจ้งเตือนได้"
-      );
-    } finally {
-      setAcknowledgingId(null);
-    }
-  }
 
   if (loading) {
     return (
@@ -151,11 +141,9 @@ export default function AlertHistoryManagement() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Alert Management
+            ประวัติการแจ้งเตือน
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            ประวัติการแจ้งเตือนและสถานะการรับทราบ
-          </p>
+          
         </div>
 
         <button
@@ -171,12 +159,6 @@ export default function AlertHistoryManagement() {
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
-        </div>
-      )}
-
-      {message && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          {message}
         </div>
       )}
 
@@ -204,7 +186,7 @@ export default function AlertHistoryManagement() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-900">ค้นหาและกรองข้อมูล</h2>
+        <h2 className="font-semibold text-slate-900">ค้นหาการแจ้งเตือน</h2>
 
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <div>
@@ -230,17 +212,13 @@ export default function AlertHistoryManagement() {
             >
               ระดับความรุนแรง
             </label>
-            <select
+            <SearchableSelect
               id="alert-severity"
               value={severityFilter}
-              onChange={(e) => setSeverityFilter(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900"
-            >
-              <option value="all">ทุกระดับ</option>
-              <option value="critical">วิกฤต</option>
-              <option value="warning">เฝ้าระวัง</option>
-              <option value="info">ข้อมูล</option>
-            </select>
+              onChange={setSeverityFilter}
+              placeholder="ทุกระดับ"
+              options={[{ value: "all", label: "ทุกระดับ" }, { value: "critical", label: "วิกฤต" }, { value: "warning", label: "เฝ้าระวัง" }, { value: "info", label: "ข้อมูล" }]}
+            />
           </div>
 
           <div>
@@ -250,17 +228,13 @@ export default function AlertHistoryManagement() {
             >
               สถานะ
             </label>
-            <select
+            <SearchableSelect
               id="alert-status"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900"
-            >
-              <option value="all">ทุกสถานะ</option>
-              <option value="active">รอรับทราบ</option>
-              <option value="acknowledged">รับทราบแล้ว</option>
-              <option value="resolved">แก้ไขแล้ว</option>
-            </select>
+              onChange={setStatusFilter}
+              placeholder="ทุกสถานะ"
+              options={[{ value: "all", label: "ทุกสถานะ" }, { value: "active", label: "รอรับทราบ" }, { value: "acknowledged", label: "รับทราบแล้ว" }, { value: "resolved", label: "แก้ไขแล้ว" }]}
+            />
           </div>
         </div>
       </section>
@@ -268,7 +242,7 @@ export default function AlertHistoryManagement() {
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-5">
           <h2 className="font-semibold text-slate-900">
-            ประวัติการแจ้งเตือน ({filteredAlerts.length})
+            รายการแจ้งเตือน ({filteredAlerts.length})
           </h2>
           <p className="mt-1 text-xs text-slate-500">
             แสดงข้อมูลล่าสุดไม่เกิน 200 รายการ
@@ -289,9 +263,6 @@ export default function AlertHistoryManagement() {
                   <th className="px-5 py-3 font-medium">การแจ้งเตือน</th>
                   <th className="px-5 py-3 font-medium">ระดับ</th>
                   <th className="px-5 py-3 font-medium">สถานะ</th>
-                  <th className="px-5 py-3 text-right font-medium">
-                    การดำเนินการ
-                  </th>
                 </tr>
               </thead>
 
@@ -357,22 +328,6 @@ export default function AlertHistoryManagement() {
                       )}
                     </td>
 
-                    <td className="px-5 py-4 text-right">
-                      {alert.status === "active" ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleAcknowledge(alert)}
-                          disabled={acknowledgingId === alert.alert_id}
-                          className="whitespace-nowrap rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-                        >
-                          {acknowledgingId === alert.alert_id
-                            ? "กำลังบันทึก..."
-                            : "รับทราบ"}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-400">—</span>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>

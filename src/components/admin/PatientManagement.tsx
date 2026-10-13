@@ -1,5 +1,8 @@
 "use client";
 
+import SearchableSelect from "@/components/ui/SearchableSelect";
+
+
 import { useCallback, useEffect, useState } from "react";
 import {
   dischargePatient,
@@ -150,9 +153,7 @@ export default function PatientManagement() {
         <h1 className="text-2xl font-bold text-slate-900">
           จัดการผู้ป่วย
         </h1>
-        <p className="mt-1 text-sm text-slate-600">
-          ลงทะเบียนผู้ป่วย กำหนดวอร์ด และจัดการการจำหน่าย
-        </p>
+        
       </header>
 
       {error && (
@@ -209,16 +210,13 @@ export default function PatientManagement() {
 
             <div>
               <label className={labelClass}>เพศ</label>
-              <select
+              <SearchableSelect
                 value={form.gender}
-                onChange={(e) => updateField("gender", e.target.value)}
+                onChange={(value) => updateField("gender", value)}
                 className={inputClass}
-              >
-                <option value="">ไม่ระบุ</option>
-                <option value="male">ชาย</option>
-                <option value="female">หญิง</option>
-                <option value="other">อื่น ๆ</option>
-              </select>
+                placeholder="ไม่ระบุ"
+                options={[{ value: "", label: "ไม่ระบุ" }, { value: "male", label: "ชาย" }, { value: "female", label: "หญิง" }, { value: "other", label: "อื่น ๆ" }]}
+              />
             </div>
 
             <div>
@@ -263,35 +261,27 @@ export default function PatientManagement() {
 
             <div>
               <label className={labelClass}>วอร์ด *</label>
-              <select
+              <SearchableSelect
                 value={form.wid}
-                onChange={(e) => updateField("wid", e.target.value)}
+                onChange={(value) => updateField("wid", value)}
                 className={inputClass}
                 required
-              >
-                <option value="">เลือกวอร์ด</option>
-                {wards.map((ward) => (
-                  <option key={ward.wid} value={ward.wid}>
-                    {ward.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="เลือกวอร์ด"
+                searchPlaceholder="ค้นหาชื่อวอร์ด..."
+                options={[{ value: "", label: "เลือกวอร์ด" }, ...wards.map((ward) => ({ value: ward.wid, label: ward.name }))]}
+              />
             </div>
 
             <div>
               <label className={labelClass}>เจ้าหน้าที่รับผิดชอบ</label>
-              <select
+              <SearchableSelect
                 value={form.uid}
-                onChange={(e) => updateField("uid", e.target.value)}
+                onChange={(value) => updateField("uid", value)}
                 className={inputClass}
-              >
-                <option value="">ยังไม่กำหนดรายบุคคล</option>
-                {staff.map((person) => (
-                  <option key={person.uid} value={person.uid}>
-                    {person.first_name} {person.last_name} ({person.role})
-                  </option>
-                ))}
-              </select>
+                placeholder="ยังไม่กำหนดรายบุคคล"
+                searchPlaceholder="ค้นหาชื่อเจ้าหน้าที่..."
+                options={[{ value: "", label: "ยังไม่กำหนดรายบุคคล" }, ...staff.map((person) => ({ value: person.uid, label: `${person.first_name} ${person.last_name} (${person.role})` }))]}
+              />
             </div>
 
             <div>
@@ -342,7 +332,7 @@ export default function PatientManagement() {
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-5">
           <h2 className="text-lg font-semibold text-slate-900">
-            ผู้ป่วยที่อยู่ในวอร์ด ({patients.length})
+            ผู้ป่วยที่เข้ารับการรักษา ({patients.length})
           </h2>
         </div>
 

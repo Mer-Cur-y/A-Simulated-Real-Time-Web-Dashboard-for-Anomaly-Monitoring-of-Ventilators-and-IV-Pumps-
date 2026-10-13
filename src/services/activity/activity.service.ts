@@ -6,7 +6,7 @@ export interface ActivityLog {
   act_id: string;
   action_type: "alert" | "system" | "user_action";
   description: string | null;
-  status: "active" | "acknowledged" | "resolved";
+  status: "active" | "acknowledged" | "resolved" | null;
   created_at: string;
   acknowledged_at: string | null;
   acknowledged_by: string | null;

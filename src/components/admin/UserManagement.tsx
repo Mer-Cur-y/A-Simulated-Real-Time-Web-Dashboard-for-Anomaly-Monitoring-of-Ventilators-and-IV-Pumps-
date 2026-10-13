@@ -1,16 +1,20 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   createManagedUser,
   getUsers,
   updateUserRole,
+  updateUserProfile,
+  sendUserPasswordReset,
   type SystemUser,
   type UserRole,
 } from "@/services/users/user.service";
 
 const roles: UserRole[] = ["admin", "doctor", "nurse", "staff"];
+const roleLabels: Record<UserRole, string> = { admin: "ผู้ดูแลระบบ", doctor: "แพทย์", nurse: "พยาบาล", staff: "เจ้าหน้าที่" };
 
 const inputClass =
   "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 disabled:bg-slate-100";
@@ -25,6 +29,10 @@ export default function UserManagement() {
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [resettingUid, setResettingUid] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     email: "",
@@ -35,27 +43,25 @@ export default function UserManagement() {
     role: "staff" as Exclude<UserRole, "admin">,
   });
 
-  async function loadUsers() {
+  const loadUsers = useCallback(async (quiet = false) => {
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
       setError(null);
-
       const data = await getUsers();
       setUsers(data);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "ไม่สามารถโหลดข้อมูลผู้ใช้ได้",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+      setError(err instanceof Error ? err.message : "ไม่สามารถโหลดข้อมูลผู้ใช้ได้");
+    } finally { setLoading(false); }
+  }, []);
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    void loadUsers();
+    const supabase = createClient();
+    const channel = supabase.channel("admin-users-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () => { void loadUsers(true); })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [loadUsers]);
 
   async function handleCreateUser(
     event: React.FormEvent<HTMLFormElement>,
@@ -125,7 +131,7 @@ export default function UserManagement() {
         ),
       );
 
-      setMessage("เปลี่ยน Role เรียบร้อยแล้ว");
+      setMessage(`เปลี่ยนบทบาทเป็น ${roleLabels[role]} เรียบร้อยแล้ว`);
     } catch (err) {
       setError(
         err instanceof Error
@@ -135,6 +141,32 @@ export default function UserManagement() {
     } finally {
       setSavingUid(null);
     }
+  }
+
+  async function handleSaveProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingUser) return;
+    const first_name = editFirstName.trim();
+    const last_name = editLastName.trim();
+    if (!first_name || !last_name) { setError("กรุณาระบุชื่อและนามสกุล"); return; }
+    try {
+      setSavingUid(editingUser.uid); setError(null); setMessage(null);
+      await updateUserProfile({ uid: editingUser.uid, first_name, last_name });
+      setUsers((current) => current.map((user) => user.uid === editingUser.uid ? { ...user, first_name, last_name } : user));
+      setEditingUser(null); setMessage("บันทึกชื่อและนามสกุลเรียบร้อยแล้ว");
+    } catch (err) { setError(err instanceof Error ? err.message : "ไม่สามารถแก้ไขข้อมูลผู้ใช้ได้"); }
+    finally { setSavingUid(null); }
+  }
+
+  async function handlePasswordReset(user: SystemUser) {
+    const confirmed = window.confirm(`ส่งลิงก์ตั้งรหัสผ่านใหม่ให้บัญชี ${user.first_name} ${user.last_name} หรือไม่?`);
+    if (!confirmed) return;
+    try {
+      setResettingUid(user.uid); setError(null); setMessage(null);
+      await sendUserPasswordReset(user.uid);
+      setMessage(`ส่งคำขอรีเซ็ตรหัสผ่านสำหรับ ${user.first_name} ${user.last_name} แล้ว หากบัญชีมีอีเมลที่ถูกต้อง ระบบจะส่งลิงก์ให้ทางอีเมล`);
+    } catch (err) { setError(err instanceof Error ? err.message : "ไม่สามารถส่งลิงก์รีเซ็ตรหัสผ่านได้"); }
+    finally { setResettingUid(null); }
   }
 
   if (loading) {
@@ -154,11 +186,8 @@ export default function UserManagement() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            User Management
+            จัดการบัญชีผู้ใช้งาน
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            จัดการบัญชีผู้ใช้งานและสิทธิ์การเข้าถึงระบบ
-          </p>
         </div>
 
         <button
@@ -203,9 +232,7 @@ export default function UserManagement() {
             <h2 className="text-lg font-bold text-slate-900">
               สร้างบัญชีเจ้าหน้าที่
             </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Admin กำหนดข้อมูลเข้าสู่ระบบให้เจ้าหน้าที่
-            </p>
+            
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -230,20 +257,12 @@ export default function UserManagement() {
               <label className="mb-2 block text-sm font-semibold text-slate-800">
                 Role
               </label>
-              <select
+              <SearchableSelect
                 value={form.role}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    role: e.target.value as Exclude<UserRole, "admin">,
-                  })
-                }
+                onChange={(value) => setForm({ ...form, role: value as Exclude<UserRole, "admin"> })}
                 className={inputClass}
-              >
-                <option value="doctor">Doctor</option>
-                <option value="nurse">Nurse</option>
-                <option value="staff">Staff</option>
-              </select>
+                options={[{ value: "doctor", label: "Doctor" }, { value: "nurse", label: "Nurse" }, { value: "staff", label: "Staff" }]}
+              />
             </div>
 
             <div>
@@ -338,6 +357,17 @@ export default function UserManagement() {
         </form>
       )}
 
+      {editingUser && (
+        <form onSubmit={handleSaveProfile} className="space-y-4 rounded-2xl border border-teal-200 bg-white p-5 shadow-sm">
+          <div><h2 className="font-bold text-slate-900">แก้ไขข้อมูลผู้ใช้งาน</h2><p className="mt-1 text-sm text-slate-600">รหัสผู้ใช้: <span className="font-mono">{editingUser.uid}</span></p></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div><label htmlFor="edit-first-name" className="mb-1.5 block text-sm font-medium">ชื่อ</label><input id="edit-first-name" required value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} className={inputClass}/></div>
+            <div><label htmlFor="edit-last-name" className="mb-1.5 block text-sm font-medium">นามสกุล</label><input id="edit-last-name" required value={editLastName} onChange={(e) => setEditLastName(e.target.value)} className={inputClass}/></div>
+          </div>
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditingUser(null)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium">ยกเลิก</button><button type="submit" disabled={savingUid === editingUser.uid} className="rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{savingUid === editingUser.uid ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</button></div>
+        </form>
+      )}
+
       {/* User table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
@@ -346,13 +376,13 @@ export default function UserManagement() {
               รายชื่อผู้ใช้งาน
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              ทั้งหมด {users.length} บัญชี
+              {users.length} บัญชี
             </p>
           </div>
 
           <button
             type="button"
-            onClick={loadUsers}
+            onClick={() => void loadUsers()}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-100"
           >
             รีเฟรช
@@ -360,18 +390,13 @@ export default function UserManagement() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[650px] text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-slate-100">
               <tr>
-                <th className="px-5 py-4 font-bold text-slate-800 sm:px-6">
-                  ผู้ใช้งาน
-                </th>
-                <th className="px-5 py-4 font-bold text-slate-800">
-                  Role
-                </th>
-                <th className="px-5 py-4 font-bold text-slate-800">
-                  วันที่สร้าง
-                </th>
+                <th className="px-5 py-4 font-bold text-slate-800 sm:px-6">ผู้ใช้งาน</th>
+                <th className="px-5 py-4 font-bold text-slate-800">บทบาท</th>
+                <th className="px-5 py-4 font-bold text-slate-800">วันที่สร้าง</th>
+                <th className="px-5 py-4 text-right font-bold text-slate-800">จัดการบัญชี</th>
               </tr>
             </thead>
 
@@ -391,23 +416,13 @@ export default function UserManagement() {
                   </td>
 
                   <td className="px-5 py-4">
-                    <select
+                    <SearchableSelect
                       value={user.role}
                       disabled={savingUid === user.uid}
-                      onChange={(event) =>
-                        handleRoleChange(
-                          user.uid,
-                          event.target.value as UserRole,
-                        )
-                      }
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200 disabled:opacity-50"
-                    >
-                      {roles.map((role) => (
-                        <option key={role} value={role}>
-                          {role}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => handleRoleChange(user.uid, value as UserRole)}
+                      className="rounded-lg"
+                      options={roles.map((role) => ({ value: role, label: roleLabels[role] }))}
+                    />
 
                     {savingUid === user.uid && (
                       <span className="ml-2 text-xs text-slate-600">
@@ -418,6 +433,12 @@ export default function UserManagement() {
 
                   <td className="px-5 py-4 text-slate-700">
                     {new Date(user.created_at).toLocaleString("th-TH")}
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <button type="button" onClick={() => { setEditingUser(user); setEditFirstName(user.first_name); setEditLastName(user.last_name); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">แก้ไขชื่อ</button>
+                      <button type="button" onClick={() => void handlePasswordReset(user)} disabled={resettingUid === user.uid} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50">{resettingUid === user.uid ? "กำลังส่ง..." : "รีเซ็ตรหัสผ่าน"}</button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -21,55 +21,55 @@ const cards: {
   },
   {
     key: "normalPatients",
-    label: "Normal",
+    label: "ปกติ",
     color: "border-emerald-200",
     valueColor: "text-emerald-700",
   },
   {
     key: "warningPatients",
-    label: "Warning",
+    label: "เฝ้าระวัง",
     color: "border-amber-200",
     valueColor: "text-amber-700",
   },
   {
     key: "criticalPatients",
-    label: "Critical",
+    label: "วิกฤต",
     color: "border-red-200",
     valueColor: "text-red-700",
   },
   {
     key: "onlineDevices",
-    label: "อุปกรณ์ Online",
+    label: "อุปกรณ์ออนไลน์",
     color: "border-emerald-200",
     valueColor: "text-emerald-700",
   },
   {
     key: "offlineDevices",
-    label: "อุปกรณ์ Offline",
+    label: "อุปกรณ์ออฟไลน์",
     color: "border-red-200",
     valueColor: "text-red-700",
   },
   {
     key: "maintenanceDevices",
-    label: "อุปกรณ์ Maintenance",
+    label: "อุปกรณ์ที่ซ่อมบำรุง",
     color: "border-amber-200",
     valueColor: "text-amber-700",
   },
   {
     key: "activeAlerts",
-    label: "Alert ที่ยัง Active",
+    label: "การแจ้งเตือนที่ยังดำเนินอยู่",
     color: "border-orange-200",
     valueColor: "text-orange-700",
   },
   {
     key: "criticalAlerts",
-    label: "Critical Alert",
+    label: "วิกฤต Alert",
     color: "border-red-200",
     valueColor: "text-red-700",
   },
   {
     key: "totalWards",
-    label: "จำนวน Ward",
+    label: "จำนวนวอร์ด",
     color: "border-blue-200",
     valueColor: "text-blue-700",
   },
@@ -138,11 +138,9 @@ export default function DashboardStatistics() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">
-            สถิติภาพรวม
+            ภาพรวมสถานะ
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            สรุปสถานะผู้ป่วย อุปกรณ์ และการแจ้งเตือน
-          </p>
+          
         </div>
 
         <button

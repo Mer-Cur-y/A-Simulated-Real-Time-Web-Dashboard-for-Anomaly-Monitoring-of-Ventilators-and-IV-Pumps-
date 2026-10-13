@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -9,16 +8,13 @@ import { createClient } from "@/lib/supabase/client";
 
 type UserRole = "admin" | "doctor" | "nurse" | "staff";
 
-export default function AppShell({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [role, setRole] = useState<UserRole | null>(null);
 
-  const isLoginPage = pathname === "/" || pathname === "/login";
+  const isLoginPage =
+    pathname === "/" || pathname === "/login" || pathname === "/reset-password";
 
   useEffect(() => {
     if (isLoginPage) {
@@ -82,12 +78,10 @@ export default function AppShell({
     <div className="flex min-h-screen">
       <AppNavigator />
 
-      <main className="min-w-0 flex-1">
-        {children}
-      </main>
+      <main className="min-w-0 flex-1">{children}</main>
 
       {role !== null && role !== "admin" && (
-        <div className="fixed right-4 top-4 z-[70]">
+        <div className="fixed right-4 top-4 z-[9999]">
           <GlobalAlertNotification />
         </div>
       )}

@@ -16,7 +16,7 @@ const navigationItems = [
     roles: ["admin"],
   },
   {
-    label: "Dashboard ผู้ป่วย",
+    label: "ภาพรวมผู้ป่วย",
     href: "/dashboard",
     icon: "♡",
     roles: ["doctor", "nurse", "staff"],
@@ -46,13 +46,19 @@ const navigationItems = [
     roles: ["admin"],
   },
   {
+    label: "อุปกรณ์และการจับคู่ผู้ป่วย",
+    href: "/admin/devices",
+    icon: "⌁",
+    roles: ["admin"],
+  },
+  {
     label: "จัดการผู้ใช้",
     href: "/admin/users",
     icon: "♧",
     roles: ["admin"],
   },
   {
-    label: "เกณฑ์เซนเซอร์",
+    label: "เกณฑ์แจ้งเตือนเซนเซอร์",
     href: "/admin/thresholds",
     icon: "⚙",
     roles: ["admin"],
@@ -75,6 +81,7 @@ const navigationItems = [
 export default function AppNavigator() {
   const pathname = usePathname();
   const [role, setRole] = useState<UserRole | null>(null);
+  const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
@@ -93,18 +100,26 @@ export default function AppNavigator() {
         } = await supabase.auth.getUser();
 
         if (authError || !user) {
-          if (mounted) setRole(null);
+          if (mounted) {
+            setRole(null);
+            setDisplayName("");
+          }
           return;
         }
 
         const { data, error } = await supabase
           .from("users")
-          .select("role")
+          .select("role, first_name, last_name")
           .eq("uid", user.id)
           .single();
 
         if (!error && mounted) {
           setRole(data.role as UserRole);
+          const fullName = [data.first_name, data.last_name]
+            .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+            .join(" ")
+            .trim();
+          setDisplayName(fullName || user.email || "ผู้ใช้งาน");
         }
       } finally {
         if (mounted) setLoading(false);
@@ -204,10 +219,13 @@ export default function AppNavigator() {
         </div>
 
         <div className="border-b border-slate-200 px-5 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Signed in as
+          <p className="text-xs font-medium text-slate-500">
+            เข้าสู่ระบบในชื่อ
           </p>
-          <p className="mt-1 font-medium capitalize">{role}</p>
+          <p className="mt-1 break-words font-semibold text-slate-900">{displayName || "ผู้ใช้งาน"}</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {({ admin: "ผู้ดูแลระบบ", doctor: "แพทย์", nurse: "พยาบาล", staff: "เจ้าหน้าที่" } as Record<UserRole, string>)[role]}
+          </p>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">

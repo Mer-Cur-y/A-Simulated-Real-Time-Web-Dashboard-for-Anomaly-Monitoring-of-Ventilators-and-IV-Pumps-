@@ -1,7 +1,9 @@
 "use client";
 
+import SearchableSelect from "@/components/ui/SearchableSelect";
+
+
 import DeviceOfflineAlerts from "@/components/devices/DeviceOfflineAlerts";
-import DeviceManagement from "@/components/devices/DeviceManagement";
 import { useMemo, useState } from "react";
 import Topbar from "@/components/layout/Topbar";
 import { useRouter } from "next/navigation";
@@ -192,19 +194,13 @@ export default function Dashboard() {
               />
             </label>
 
-            <select
-              className="select select-bordered w-full"
+            <SearchableSelect
               value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value as PatientStatusFilter)
-              }
+              onChange={(value) => setStatusFilter(value as PatientStatusFilter)}
               aria-label="กรองตามสถานะผู้ป่วย"
-            >
-              <option value="all">ทุกสถานะ</option>
-              <option value="normal">Normal</option>
-              <option value="warning">Warning</option>
-              <option value="critical">Critical</option>
-            </select>
+              placeholder="ทุกสถานะ"
+              options={[{ value: "all", label: "ทุกสถานะ" }, { value: "normal", label: "Normal" }, { value: "warning", label: "Warning" }, { value: "critical", label: "Critical" }]}
+            />
           </div>
         </section>
 

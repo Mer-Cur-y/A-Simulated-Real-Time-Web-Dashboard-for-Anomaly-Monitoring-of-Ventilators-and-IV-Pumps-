@@ -27,7 +27,7 @@ function getActionLabel(
       return "Alert";
 
     case "user_action":
-      return "การดำเนินการของเจ้าหน้าที่";
+      return "บันทึกข้อความ";
 
     case "system":
       return "ระบบ";
@@ -40,6 +40,7 @@ function getActionLabel(
 function getStatusLabel(
   status: ActivityLogType["status"]
 ) {
+  if (!status) return "";
   switch (status) {
     case "active":
       return "Active";
@@ -178,7 +179,7 @@ export default function ActivityLog({ uwid }: Props) {
     return (
       <section className="rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm">
         <h2 className="text-lg font-bold">
-          Activity History
+          ประวัติการดูแลผู้ป่วย
         </h2>
 
         <p className="mt-2 text-sm text-base-content/60">
@@ -198,12 +199,10 @@ export default function ActivityLog({ uwid }: Props) {
       {/* Header */}
       <div className="mb-5">
         <h2 className="text-lg font-bold">
-          Activity History
+          ประวัติการดูแลผู้ป่วย
         </h2>
 
-        <p className="mt-1 text-sm text-base-content/60">
-          ประวัติการดำเนินการเกี่ยวกับผู้ป่วย
-        </p>
+        
       </div>
 
       {/* ================================
@@ -283,13 +282,13 @@ export default function ActivityLog({ uwid }: Props) {
                   </p>
                 )}
 
-                <div className="mt-2">
-                  <span className="badge badge-sm badge-ghost">
-                    {getStatusLabel(
-                      activity.status
-                    )}
-                  </span>
-                </div>
+                {activity.action_type !== "user_action" && activity.status && (
+                  <div className="mt-2">
+                    <span className="badge badge-sm badge-ghost">
+                      {getStatusLabel(activity.status)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           ))}

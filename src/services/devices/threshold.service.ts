@@ -47,3 +47,21 @@ export async function updateSensorThreshold(
     throw new Error(error.message);
   }
 }
+
+export async function createSensorThreshold(values: {
+  sensor_type: string;
+  metric: string;
+  warning_min: number | null;
+  warning_max: number | null;
+  critical_min: number | null;
+  critical_max: number | null;
+  enabled: boolean;
+}): Promise<void> {
+  const { error } = await supabase.from("sensor_thresholds").insert(values);
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("มีเงื่อนไขสำหรับ Sensor และ Metric นี้อยู่แล้ว กรุณาแก้ไขรายการเดิม");
+    }
+    throw new Error(error.message);
+  }
+}

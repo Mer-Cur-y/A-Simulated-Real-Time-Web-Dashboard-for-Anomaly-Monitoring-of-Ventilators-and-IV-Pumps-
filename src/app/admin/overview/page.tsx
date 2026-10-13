@@ -377,15 +377,9 @@ export default function AdminOverviewPage() {
         {/* Page heading */}
         <header className="flex flex-col gap-4 rounded-2xl border border-base-300 bg-base-100 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-primary">
-              ADMINISTRATION
-            </p>
             <h1 className="mt-1 text-2xl font-bold">
-              System Overview
+              ภาพรวมระบบ
             </h1>
-            <p className="mt-1 text-sm text-base-content/60">
-              ภาพรวมการทำงานของระบบติดตามผู้ป่วย
-            </p>
           </div>
           
 
@@ -409,7 +403,7 @@ export default function AdminOverviewPage() {
         {/* Quick links */}
         <section>
           <h2 className="mb-3 text-lg font-semibold">
-            ทางลัดสำหรับ Admin
+            เมนูจัดการระบบ
           </h2>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -454,7 +448,7 @@ export default function AdminOverviewPage() {
           <div className="mb-3">
             <h2 className="text-lg font-semibold">ภาพรวมระบบ</h2>
             <p className="text-sm text-base-content/60">
-              จำนวนข้อมูลหลักที่ลงทะเบียนในระบบ
+              ข้อมูลในระบบ
             </p>
           </div>
 
@@ -495,7 +489,7 @@ export default function AdminOverviewPage() {
           <div className="mb-3">
             <h2 className="text-lg font-semibold">สถานะการแจ้งเตือน</h2>
             <p className="text-sm text-base-content/60">
-              Alert ที่ยังมีสถานะ Active
+              การแจ้งเตือนที่ยังดำเนินอยู่
             </p>
           </div>
 
@@ -531,27 +525,27 @@ export default function AdminOverviewPage() {
           <div className="mb-4">
             <h2 className="text-lg font-semibold">สถานะผู้ป่วย</h2>
             <p className="text-sm text-base-content/60">
-              ประเมินจากสถานะ Monitor และระดับสารน้ำในข้อมูล Ward
+              สรุปจากสถานะการติดตามและข้อมูลสารน้ำ
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
-              <p className="text-sm">Normal · ปกติ</p>
+              <p className="text-sm">ปกติ</p>
               <p className="mt-2 text-3xl font-bold">
                 {loading ? "—" : stats.normalPatients}
               </p>
             </div>
 
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
-              <p className="text-sm">Warning · เฝ้าระวัง</p>
+              <p className="text-sm">เฝ้าระวัง</p>
               <p className="mt-2 text-3xl font-bold">
                 {loading ? "—" : stats.warningPatients}
               </p>
             </div>
 
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
-              <p className="text-sm">Critical · วิกฤต</p>
+              <p className="text-sm">วิกฤต</p>
               <p className="mt-2 text-3xl font-bold">
                 {loading ? "—" : stats.criticalPatients}
               </p>

@@ -138,7 +138,7 @@ export default function PatientDevices({
     return (
       <section className="rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm">
         <h2 className="text-lg font-bold">
-          Connected Devices
+          อุปกรณ์ที่เชื่อมต่อ
         </h2>
 
         <p className="mt-2 text-sm text-base-content/60">
@@ -152,12 +152,10 @@ export default function PatientDevices({
     <section className="rounded-2xl border border-base-300 bg-base-100 p-5 shadow-sm">
       <div className="mb-4">
         <h2 className="text-lg font-bold">
-          Connected Devices
+          อุปกรณ์ที่เชื่อมต่อ
         </h2>
 
-        <p className="mt-1 text-sm text-base-content/60">
-          อุปกรณ์ที่เชื่อมต่อกับผู้ป่วยรายนี้
-        </p>
+        
       </div>
 
       {devices.length === 0 ? (
@@ -200,7 +198,7 @@ export default function PatientDevices({
 
                 <div className="mt-4 border-t border-base-200 pt-3">
                   <p className="text-xs text-base-content/50">
-                    Last seen
+                    รับข้อมูลล่าสุด
                   </p>
 
                   <p className="mt-1 text-sm">

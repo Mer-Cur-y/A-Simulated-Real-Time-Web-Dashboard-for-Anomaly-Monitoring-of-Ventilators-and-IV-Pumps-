@@ -2,15 +2,13 @@ import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
 
-export type GlobalActivityAction =
-  | "alert"
-  | "system"
-  | "user_action";
+export type GlobalActivityAction = "alert" | "system" | "user_action";
 
 export type GlobalActivityStatus =
   | "active"
   | "acknowledged"
-  | "resolved";
+  | "resolved"
+  | null;
 
 export interface GlobalActivity {
   act_id: string;
@@ -32,12 +30,93 @@ export interface GlobalActivity {
   acknowledged_by_name: string | null;
 }
 
+const UUID_REGEX =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
+interface AlertDetail {
+  alert_id: string;
+  aid: string;
+}
+
+interface AlertTypeDetail {
+  aid: string;
+  alert_type: string;
+  alert_message: string | null;
+}
+
+/**
+ * แปลง UUID ของ Alert ใน description
+ * ให้เป็นรายละเอียดการแจ้งเตือนที่อ่านเข้าใจได้
+ */
+async function resolveAlertDescriptions(
+  descriptions: (string | null)[],
+): Promise<Map<string, string>> {
+  const alertIds = [
+    ...new Set(
+      descriptions
+        .flatMap((description) => description?.match(UUID_REGEX) ?? [])
+        .map((id) => id.toLowerCase()),
+    ),
+  ];
+
+  const descriptionMap = new Map<string, string>();
+
+  if (alertIds.length === 0) {
+    return descriptionMap;
+  }
+
+  const { data: alerts, error: alertsError } = await supabase
+    .from("alerts")
+    .select("alert_id, aid")
+    .in("alert_id", alertIds);
+
+  if (alertsError) {
+    throw new Error(alertsError.message);
+  }
+
+  const alertRows = (alerts ?? []) as AlertDetail[];
+
+  if (alertRows.length === 0) {
+    return descriptionMap;
+  }
+
+  const aids = [...new Set(alertRows.map((alert) => alert.aid))];
+
+  const { data: alertTypes, error: typesError } = await supabase
+    .from("alert_types")
+    .select("aid, alert_type, alert_message")
+    .in("aid", aids);
+
+  if (typesError) {
+    throw new Error(typesError.message);
+  }
+
+  const typesById = new Map(
+    ((alertTypes ?? []) as AlertTypeDetail[]).map((item) => [item.aid, item]),
+  );
+
+  for (const alert of alertRows) {
+    const alertType = typesById.get(alert.aid);
+
+    // ใช้ข้อความอธิบายก่อน ถ้าไม่มีจึงใช้ชื่อประเภท Alert
+    const detail =
+      alertType?.alert_message?.trim() || alertType?.alert_type?.trim();
+
+    if (detail) {
+      descriptionMap.set(alert.alert_id.toLowerCase(), detail);
+    }
+  }
+
+  return descriptionMap;
+}
+
 export async function getGlobalActivities(
   userId?: string,
 ): Promise<GlobalActivity[]> {
-   let query = supabase
+  let query = supabase
     .from("activity_log")
-    .select(`
+    .select(
+      `
       act_id,
       action_type,
       description,
@@ -47,7 +126,8 @@ export async function getGlobalActivities(
       acknowledged_by,
       uid,
       uwid
-    `)
+    `,
+    )
     .order("created_at", { ascending: false })
     .limit(300);
 
@@ -56,46 +136,78 @@ export async function getGlobalActivities(
   }
 
   const { data: logs, error } = await query;
-  if (!logs?.length) return [];
 
-  const userIds = [
-    ...new Set(
-      logs
-        .flatMap((log) => [log.uid, log.acknowledged_by])
-        .filter((id): id is string => Boolean(id))
-    ),
-  ];
+  if (error) {
+    throw new Error(error.message);
+  }
 
-  const uwids = [
-    ...new Set(
-      logs
-        .map((log) => log.uwid)
-        .filter((id): id is string => Boolean(id))
-    ),
-  ];
+  if (!logs?.length) {
+    return [];
+  }
 
-  const [usersResult, admissionsResult] = await Promise.all([
-    userIds.length
-      ? supabase
-          .from("users")
-          .select("uid, first_name, last_name, role")
-          .in("uid", userIds)
-      : Promise.resolve({ data: [], error: null }),
+  const [usersResult, admissionsResult, alertDescriptions] = await Promise.all([
+    (async () => {
+      const userIds = [
+        ...new Set(
+          logs
+            .flatMap((log) => [log.uid, log.acknowledged_by])
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
 
-    uwids.length
-      ? supabase
-          .from("patients_on_wards")
-          .select("uwid, opd, wid, room_number, bed_number")
-          .in("uwid", uwids)
-      : Promise.resolve({ data: [], error: null }),
+      if (userIds.length === 0) {
+        return { data: [], error: null };
+      }
+
+      return supabase
+        .from("users")
+        .select("uid, first_name, last_name, role")
+        .in("uid", userIds);
+    })(),
+
+    (async () => {
+      const uwids = [
+        ...new Set(
+          logs.map((log) => log.uwid).filter((id): id is string => Boolean(id)),
+        ),
+      ];
+
+      if (uwids.length === 0) {
+        return { data: [], error: null };
+      }
+
+      return supabase
+        .from("patients_on_wards")
+        .select("uwid, opd, wid, room_number, bed_number")
+        .in("uwid", uwids);
+    })(),
+
+    resolveAlertDescriptions(logs.map((log) => log.description)),
   ]);
 
-  if (usersResult.error) throw new Error(usersResult.error.message);
-  if (admissionsResult.error) throw new Error(admissionsResult.error.message);
+  if (usersResult.error) {
+    throw new Error(usersResult.error.message);
+  }
+
+  if (admissionsResult.error) {
+    throw new Error(admissionsResult.error.message);
+  }
 
   const admissions = admissionsResult.data ?? [];
-  const opds = [...new Set(admissions.map((item) => item.opd))];
-  const wids = [...new Set(admissions.map((item) => item.wid))];
+  const opds = [
+    ...new Set(
+      admissions
+        .map((item) => item.opd)
+        .filter((opd): opd is string => Boolean(opd)),
+    ),
+  ];
+  const wids = [
+    ...new Set(
+      admissions
+        .map((item) => item.wid)
+        .filter((wid): wid is string => Boolean(wid)),
+    ),
+  ];
 
   const [patientsResult, wardsResult] = await Promise.all([
     opds.length
@@ -106,52 +218,55 @@ export async function getGlobalActivities(
       : Promise.resolve({ data: [], error: null }),
 
     wids.length
-      ? supabase
-          .from("wards")
-          .select("wid, name")
-          .in("wid", wids)
+      ? supabase.from("wards").select("wid, name").in("wid", wids)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
-  if (patientsResult.error) throw new Error(patientsResult.error.message);
-  if (wardsResult.error) throw new Error(wardsResult.error.message);
+  if (patientsResult.error) {
+    throw new Error(patientsResult.error.message);
+  }
+
+  if (wardsResult.error) {
+    throw new Error(wardsResult.error.message);
+  }
 
   const usersById = new Map(
-    (usersResult.data ?? []).map((user) => [user.uid, user])
+    (usersResult.data ?? []).map((user) => [user.uid, user]),
   );
 
-  const admissionsById = new Map(
-    admissions.map((item) => [item.uwid, item])
-  );
+  const admissionsById = new Map(admissions.map((item) => [item.uwid, item]));
 
   const patientsByOpd = new Map(
-    (patientsResult.data ?? []).map((patient) => [patient.opd, patient])
+    (patientsResult.data ?? []).map((patient) => [patient.opd, patient]),
   );
 
   const wardsById = new Map(
-    (wardsResult.data ?? []).map((ward) => [ward.wid, ward])
+    (wardsResult.data ?? []).map((ward) => [ward.wid, ward]),
   );
 
   return logs.map((log) => {
     const staff = log.uid ? usersById.get(log.uid) : null;
+
     const acknowledgedBy = log.acknowledged_by
       ? usersById.get(log.acknowledged_by)
       : null;
 
-    const admission = log.uwid
-      ? admissionsById.get(log.uwid)
-      : null;
+    const admission = log.uwid ? admissionsById.get(log.uwid) : null;
 
-    const patient = admission
-      ? patientsByOpd.get(admission.opd)
-      : null;
+    const patient = admission ? patientsByOpd.get(admission.opd) : null;
 
-    const ward = admission
-      ? wardsById.get(admission.wid)
+    const ward = admission ? wardsById.get(admission.wid) : null;
+
+    const description = log.description
+      ? log.description.replace(
+          UUID_REGEX,
+          (uuid: string) => alertDescriptions.get(uuid.toLowerCase()) ?? uuid,
+        )
       : null;
 
     return {
       ...log,
+      description,
       staff_name: staff
         ? `${staff.first_name} ${staff.last_name}`
         : log.uid

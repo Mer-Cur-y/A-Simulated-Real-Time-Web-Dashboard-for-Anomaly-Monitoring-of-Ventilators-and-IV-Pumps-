@@ -664,6 +664,45 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
             </div>
           </div>
         </section>
+        <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.05)]">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-800">
+              บันทึกการดูแล
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-400">
+              บันทึกรายละเอียดการดำเนินการของเจ้าหน้าที่
+            </p>
+          </div>
+
+          <div className="mt-5">
+            <textarea
+              value={activityNote}
+              onChange={(e) => setActivityNote(e.target.value)}
+              placeholder="เช่น ให้ออกซิเจน 2 L/min และติดตาม SpO₂ ทุก 15 นาที"
+              rows={4}
+              maxLength={1000}
+              className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+            />
+
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                {activityNote.length}/1000
+              </span>
+
+              <button
+                onClick={handleCreateActivityNote}
+                disabled={
+                  savingActivityNote || activityNote.trim().length === 0
+                }
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingActivityNote ? "กำลังบันทึก..." : "บันทึก"}
+              </button>
+            </div>
+          </div>
+        </section>
+        
 
         {/* Alerts */}
 
@@ -760,47 +799,10 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
             )}
           </div>
         </section>
+        
 
         {/* Care Note */}
 
-        <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.05)]">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-800">
-              บันทึกการดูแล
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-400">
-              บันทึกรายละเอียดการดำเนินการของเจ้าหน้าที่
-            </p>
-          </div>
-
-          <div className="mt-5">
-            <textarea
-              value={activityNote}
-              onChange={(e) => setActivityNote(e.target.value)}
-              placeholder="เช่น ให้ออกซิเจน 2 L/min และติดตาม SpO₂ ทุก 15 นาที"
-              rows={4}
-              maxLength={1000}
-              className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-            />
-
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-xs text-slate-400">
-                {activityNote.length}/1000
-              </span>
-
-              <button
-                onClick={handleCreateActivityNote}
-                disabled={
-                  savingActivityNote || activityNote.trim().length === 0
-                }
-                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {savingActivityNote ? "กำลังบันทึก..." : "บันทึก"}
-              </button>
-            </div>
-          </div>
-        </section>
         {/* Activity Log */}
 
         <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-[0_2px_12px_rgba(20,83,45,0.05)]">
@@ -840,12 +842,14 @@ export default function PatientDetail({ uwid }: { uwid: string }) {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                            {activity.action_type}
+                            {activity.action_type === "user_action" ? "บันทึกข้อความ" : activity.action_type === "alert" ? "การแจ้งเตือน" : "ระบบ"}
                           </span>
 
-                          <span className="text-xs text-slate-400">
-                            {activity.status}
-                          </span>
+                          {activity.action_type !== "user_action" && activity.status && (
+                            <span className="text-xs text-slate-400">
+                              {activity.status}
+                            </span>
+                          )}
                         </div>
 
                         <p className="mt-2 text-sm text-slate-700">

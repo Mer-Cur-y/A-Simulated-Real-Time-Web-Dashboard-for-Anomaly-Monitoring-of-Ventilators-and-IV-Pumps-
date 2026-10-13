@@ -1,5 +1,8 @@
 "use client";
 
+import SearchableSelect from "@/components/ui/SearchableSelect";
+
+
 import type { Ward } from "@/types/ward";
 
 interface WardFilterProps {
@@ -22,27 +25,15 @@ export default function WardFilter({
         Ward
       </label>
 
-      <select
+      <SearchableSelect
         id="ward-filter"
         value={selectedWardId}
-        onChange={(event) =>
-          onWardChange(event.target.value)
-        }
-        className="select select-bordered min-w-48"
-      >
-        <option value="all">
-          ทุก Ward
-        </option>
-
-        {wards.map((ward) => (
-          <option
-            key={ward.wid}
-            value={ward.wid}
-          >
-            {ward.name}
-          </option>
-        ))}
-      </select>
+        onChange={onWardChange}
+        className="min-w-48"
+        placeholder="ทุก Ward"
+        searchPlaceholder="ค้นหาวอร์ด..."
+        options={[{ value: "all", label: "ทุก Ward" }, ...wards.map((ward) => ({ value: ward.wid, label: ward.name }))]}
+      />
     </div>
   );
 }

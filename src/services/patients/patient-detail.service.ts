@@ -38,7 +38,7 @@ export interface PatientDetailData {
     alert_id: string;
     severity: string;
     value: number | null;
-    status: string;
+    status: string | null;
     created_at: string;
   }[];
 
@@ -46,7 +46,7 @@ export interface PatientDetailData {
     act_id: string;
     action_type: string;
     description: string | null;
-    status: string;
+    status: string | null;
     created_at: string;
   }[];
 }

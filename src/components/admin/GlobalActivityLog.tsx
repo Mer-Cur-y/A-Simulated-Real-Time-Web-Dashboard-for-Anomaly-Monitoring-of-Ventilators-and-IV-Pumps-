@@ -1,5 +1,6 @@
 "use client";
 
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getGlobalActivities,
@@ -11,10 +12,10 @@ import {
 const actionLabels: Record<GlobalActivityAction, string> = {
   alert: "การแจ้งเตือน",
   system: "ระบบ",
-  user_action: "เจ้าหน้าที่",
+  user_action: "บันทึกข้อความ",
 };
 
-const statusLabels: Record<GlobalActivityStatus, string> = {
+const statusLabels: Record<Exclude<GlobalActivityStatus, null>, string> = {
   active: "ดำเนินการอยู่",
   acknowledged: "รับทราบแล้ว",
   resolved: "เสร็จสิ้น",
@@ -22,6 +23,8 @@ const statusLabels: Record<GlobalActivityStatus, string> = {
 
 function statusStyle(status: GlobalActivityStatus) {
   switch (status) {
+    case null:
+      return "";
     case "active":
       return "bg-amber-100 text-amber-800";
     case "acknowledged":
@@ -58,7 +61,7 @@ export default function GlobalActivityLog({ userId }: { userId?: string }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     void loadActivities();
@@ -120,11 +123,9 @@ export default function GlobalActivityLog({ userId }: { userId?: string }) {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Global Activity Log
+            บันทึกกิจกรรมระบบ
           </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            ตรวจสอบประวัติการทำงานของเจ้าหน้าที่และกิจกรรมในระบบ
-          </p>
+          
         </div>
 
         <button
@@ -163,7 +164,7 @@ export default function GlobalActivityLog({ userId }: { userId?: string }) {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold text-slate-900">ค้นหาและกรองกิจกรรม</h2>
+        <h2 className="font-semibold text-slate-900">ค้นหากิจกรรม</h2>
 
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <div>
@@ -189,17 +190,13 @@ export default function GlobalActivityLog({ userId }: { userId?: string }) {
             >
               ประเภทกิจกรรม
             </label>
-            <select
+            <SearchableSelect
               id="activity-type"
               value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900"
-            >
-              <option value="all">ทุกประเภท</option>
-              <option value="user_action">เจ้าหน้าที่</option>
-              <option value="alert">การแจ้งเตือน</option>
-              <option value="system">ระบบ</option>
-            </select>
+              onChange={setActionFilter}
+              placeholder="ทุกประเภท"
+              options={[{ value: "all", label: "ทุกประเภท" }, { value: "user_action", label: "บันทึกข้อความ" }, { value: "alert", label: "การแจ้งเตือน" }, { value: "system", label: "ระบบ" }]}
+            />
           </div>
 
           <div>
@@ -209,17 +206,13 @@ export default function GlobalActivityLog({ userId }: { userId?: string }) {
             >
               สถานะ
             </label>
-            <select
+            <SearchableSelect
               id="activity-status"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-slate-900"
-            >
-              <option value="all">ทุกสถานะ</option>
-              <option value="active">ดำเนินการอยู่</option>
-              <option value="acknowledged">รับทราบแล้ว</option>
-              <option value="resolved">เสร็จสิ้น</option>
-            </select>
+              onChange={setStatusFilter}
+              placeholder="ทุกสถานะ"
+              options={[{ value: "all", label: "ทุกสถานะ" }, { value: "active", label: "ดำเนินการอยู่" }, { value: "acknowledged", label: "รับทราบแล้ว" }, { value: "resolved", label: "เสร็จสิ้น" }]}
+            />
           </div>
         </div>
       </section>
@@ -227,11 +220,9 @@ export default function GlobalActivityLog({ userId }: { userId?: string }) {
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 p-5">
           <h2 className="font-semibold text-slate-900">
-            รายการกิจกรรม ({filteredActivities.length})
+            กิจกรรมทั้งหมด ({filteredActivities.length})
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            แสดงข้อมูลล่าสุดไม่เกิน 300 รายการ
-          </p>
+          
         </div>
 
         {filteredActivities.length === 0 ? (
@@ -248,7 +239,7 @@ export default function GlobalActivityLog({ userId }: { userId?: string }) {
                   <th className="px-5 py-3 font-medium">รายละเอียด</th>
                   <th className="px-5 py-3 font-medium">ผู้ป่วย / วอร์ด</th>
                   <th className="px-5 py-3 font-medium">ประเภท</th>
-                  <th className="px-5 py-3 font-medium">สถานะ</th>
+                  <th className="px-5 py-3 font-medium">สถานะ Alert</th>
                 </tr>
               </thead>
 
@@ -309,11 +300,15 @@ export default function GlobalActivityLog({ userId }: { userId?: string }) {
                     </td>
 
                     <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle(activity.status)}`}
-                      >
-                        {statusLabels[activity.status]}
-                      </span>
+                      {activity.action_type === "user_action" || !activity.status ? (
+                        <span className="text-slate-300">—</span>
+                      ) : (
+                        <span
+                          className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle(activity.status)}`}
+                        >
+                          {statusLabels[activity.status]}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

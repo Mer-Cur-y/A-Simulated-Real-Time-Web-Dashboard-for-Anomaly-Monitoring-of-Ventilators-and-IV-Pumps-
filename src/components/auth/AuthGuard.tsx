@@ -31,7 +31,7 @@ export default function AuthGuard({
         setAuthenticated(false);
         setChecking(false);
 
-        if (pathname !== "/") {
+        if (pathname !== "/" && pathname !== "/reset-password") {
           router.replace("/");
         }
 
@@ -62,7 +62,7 @@ export default function AuthGuard({
         ) {
           setAuthenticated(false);
 
-          if (pathname !== "/") {
+          if (pathname !== "/" && pathname !== "/reset-password") {
             router.replace("/");
           }
 
@@ -105,7 +105,7 @@ export default function AuthGuard({
   }
 
   // หน้า Login สามารถเข้าได้โดยไม่ต้อง Login
-  if (pathname === "/") {
+  if (pathname === "/" || pathname === "/reset-password") {
     return <>{children}</>;
   }
 

@@ -31,18 +31,22 @@ export async function getUsers(): Promise<SystemUser[]> {
   return data ?? [];
 }
 
-export async function updateUserRole(
-  uid: string,
-  role: UserRole,
-): Promise<void> {
-  const { error } = await supabase
-    .from("users")
-    .update({ role })
-    .eq("uid", uid);
+async function invokeAdminUserAction(body: Record<string, unknown>): Promise<void> {
+  const { data, error } = await supabase.functions.invoke("admin-user-actions", { body });
+  if (error) throw new Error(error.message);
+  if (!data?.success) throw new Error(data?.error ?? "ดำเนินการกับบัญชีผู้ใช้ไม่สำเร็จ");
+}
 
-  if (error) {
-    throw new Error(error.message);
-  }
+export async function updateUserRole(uid: string, role: UserRole): Promise<void> {
+  await invokeAdminUserAction({ action: "update_role", uid, role });
+}
+
+export async function updateUserProfile(input: { uid: string; first_name: string; last_name: string }): Promise<void> {
+  await invokeAdminUserAction({ action: "update_profile", ...input });
+}
+
+export async function sendUserPasswordReset(uid: string): Promise<void> {
+  await invokeAdminUserAction({ action: "reset_password", uid });
 }
 export async function createManagedUser(input: {
   email: string;
